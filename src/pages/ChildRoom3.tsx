@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router';
    ChildRoom 3 Page - 大学校园体验（20岁）
    ═══════════════════════════════════════════ */
 
-type Phase = 'travel' | 'campus' | 'dialog' | 'dialog-cards' | 'ending';
+type Phase = 'travel' | 'campus' | 'dialog' | 'cards' | 'ending';
 
 /* ── Web Audio 音效 ── */
 let audioCtx: AudioContext | null = null;
@@ -31,11 +31,22 @@ function playTickSound() {
   } catch { /* ignore */ }
 }
 
-/* ── 对话文案（占位，等待用户提供） ── */
-const DIALOG_CARDS: string[][] = [
-  ['这是第一段对话占位文字', '等待用户提供具体内容...'],
-  ['这是第二段对话占位文字', '等待用户提供具体内容...'],
-  ['这是第三段对话占位文字', '等待用户提供具体内容...'],
+/* ── 阶段一：毛玻璃卡片对话 ── */
+const DIALOG_CARDS = [
+  ['听说有一天，', '你把手机弄丢了。'],        // 0
+  ['后来妈妈给你钱，', '买了一部新的。'],       // 1
+  ['结果刚买完没多久，', '新手机又被偷走了。'], // 2
+  ['哎……'],                                      // 3 (新增)
+  ['怎么会这么倒霉啊。'],                        // 4
+  ['不过后来，', '朋友们一起凑钱帮了你。'],   // 5
+  ['听到那个时候，', '有很多人在帮助你，', '真是太好了。'], // 6 (停留6秒)
+];
+
+/* ── 阶段二：暗背景结尾文字 ── */
+const ENDING_LINES = [
+  ['后来的你，', '偶尔还是会忘东忘西。'],
+  ['不过没关系。'],
+  ['以后我也会帮你留心的。'],
 ];
 
 /* ═══════════════════ 打字机效果 ═══════════════════ */
@@ -72,9 +83,9 @@ function TypewriterText({ text, speed = 85, onComplete }: { text: string; speed?
   );
 }
 
-/* ═══════════════════ 逐句淡入段落 ═══════════════════ */
+/* ═══════════════════ 毛玻璃卡片 ═══════════════════ */
 
-function FadeParagraph({ lines, visible, delay = 0 }: { lines: string[]; visible: boolean; delay?: number }) {
+function GlassCard({ lines, visible, fadeDelay = 0 }: { lines: string[]; visible: boolean; fadeDelay?: number }) {
   return (
     <AnimatePresence>
       {visible && (
@@ -82,7 +93,7 @@ function FadeParagraph({ lines, visible, delay = 0 }: { lines: string[]; visible
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.6, delay: fadeDelay }}
           className="flex flex-col items-center justify-center relative"
           style={{
             background: 'rgba(255, 253, 248, 0.45)',
@@ -96,7 +107,6 @@ function FadeParagraph({ lines, visible, delay = 0 }: { lines: string[]; visible
             minHeight: 120,
           }}
         >
-          {/* Breathing glow */}
           <div
             className="absolute inset-0 rounded-3xl pointer-events-none"
             style={{
@@ -107,10 +117,10 @@ function FadeParagraph({ lines, visible, delay = 0 }: { lines: string[]; visible
           <div className="relative z-10">
             {lines.map((line, i) => (
               <motion.p
-                key={i}
+                key={`${lines[0]}-${i}`}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: delay + i * 1.8 }}
+                transition={{ duration: 0.8, delay: fadeDelay + i * 1.8 }}
                 className="font-body text-[17px] leading-[2.2] text-center w-full"
                 style={{ color: '#2D3748' }}
               >
@@ -124,6 +134,37 @@ function FadeParagraph({ lines, visible, delay = 0 }: { lines: string[]; visible
   );
 }
 
+/* ═══════════════════ 结尾文字 ═══════════════════ */
+
+function EndingText({ lines, visible }: { lines: string[]; visible: boolean }) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
+          className="flex flex-col items-center text-center"
+        >
+          {lines.map((line, i) => (
+            <motion.p
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 + i * 0.8 + (i === 1 ? 0.5 : 0) }}
+              className="font-body text-[20px] leading-[2] font-bold text-white mb-1"
+              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
+            >
+              {line}
+            </motion.p>
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 /* ═══════════════════ 主组件 ═══════════════════ */
 
 export default function ChildRoom3() {
@@ -131,12 +172,17 @@ export default function ChildRoom3() {
   const [phase, setPhase] = useState<Phase>('travel');
   const [travelProgress, setTravelProgress] = useState(0);
 
-  // Dialog sub-states
+  // Dialog states
   const [showTypewriter, setShowTypewriter] = useState(false);
-  const [showCard0, setShowCard0] = useState(false);
-  const [showCard1, setShowCard1] = useState(false);
-  const [showCard2, setShowCard2] = useState(false);
-  const [cardsDone, setCardsDone] = useState(false);
+
+  // Card auto-play states
+  const [cardIndex, setCardIndex] = useState(0);
+  const [showCard, setShowCard] = useState(false);
+
+  // Ending states
+  const [endingIndex, setEndingIndex] = useState(0);
+  const [showEndingLine, setShowEndingLine] = useState(false);
+  const [showButton, setShowButton] = useState(false);
 
   // ── Phase 1: Time travel ──
   useEffect(() => {
@@ -166,52 +212,97 @@ export default function ChildRoom3() {
     }
   }, [phase]);
 
-  // ── Typewriter done → fade out → cards ──
+  // ── Typewriter done → cards ──
   const handleTypewriterDone = useCallback(() => {
+    // Stay 1s after typing complete, then fade out 1.5s
     setTimeout(() => {
       setShowTypewriter(false);
-      setPhase('dialog-cards');
-      setShowCard0(true);
-    }, 2000);
+      setTimeout(() => setPhase('cards'), 200);
+    }, 1500);
   }, []);
 
-  // ── Card chain ──
-  const handleCard0Done = useCallback(() => {
-    setTimeout(() => {
-      setShowCard0(false);
-      setTimeout(() => setShowCard1(true), 800);
-    }, 1200);
-  }, []);
-
-  const handleCard1Done = useCallback(() => {
-    setTimeout(() => {
-      setShowCard1(false);
-      setTimeout(() => setShowCard2(true), 800);
-    }, 1200);
-  }, []);
-
-  const handleCard2Done = useCallback(() => {
-    setTimeout(() => {
-      setShowCard2(false);
-      setCardsDone(true);
-      setTimeout(() => setPhase('ending'), 1500);
-    }, 500);
-  }, []);
-
-  // Auto-trigger card done callbacks
+  // ── Cards auto-play (6 cards, 4s each, pause 2s after card 3) ──
   useEffect(() => {
-    if (showCard0) { const t = setTimeout(handleCard0Done, 4500); return () => clearTimeout(t); }
-  }, [showCard0, handleCard0Done]);
+    if (phase !== 'cards') return;
 
-  useEffect(() => {
-    if (showCard1) { const t = setTimeout(handleCard1Done, 3500); return () => clearTimeout(t); }
-  }, [showCard1, handleCard1Done]);
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
 
+    const showNext = (index: number) => {
+      if (index >= DIALOG_CARDS.length) {
+        // All cards done → ending (tight transition)
+        setShowCard(false);
+        timeouts.push(setTimeout(() => setPhase('ending'), 200));
+        return;
+      }
+
+      setCardIndex(index);
+      setShowCard(true);
+
+      // Card display times: "哎……" (index 3) = 2s, card 6 (index 6) = 6s, others = 4s
+      const displayTime = index === 3 ? 2000 : index === 6 ? 6000 : 4000;
+
+      timeouts.push(setTimeout(() => {
+        setShowCard(false);
+
+        // After card 1 (index 0), card 3 (index 2), card "哎……" (index 3), pause 1s
+        const isPauseCard = index === 0 || index === 2 || index === 3;
+        const pauseTime = isPauseCard ? 1000 : 0;
+
+        timeouts.push(setTimeout(() => {
+          showNext(index + 1);
+        }, 800 + pauseTime)); // 800ms fade + optional pause
+      }, displayTime));
+    };
+
+    showNext(0);
+
+    return () => timeouts.forEach(clearTimeout);
+  }, [phase]);
+
+  // ── Ending auto-play (3 lines, 4s each, last one stays + button) ──
   useEffect(() => {
-    if (showCard2) { const t = setTimeout(handleCard2Done, 3500); return () => clearTimeout(t); }
-  }, [showCard2, handleCard2Done]);
+    if (phase !== 'ending') return;
+
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const showNextEnding = (index: number) => {
+      if (index >= ENDING_LINES.length) {
+        // Should not reach here since last line stays
+        return;
+      }
+
+      setEndingIndex(index);
+      setShowEndingLine(true);
+
+      const isLast = index === ENDING_LINES.length - 1;
+
+      if (isLast) {
+        // Last line: show for 2s then show button (keep text visible)
+        timeouts.push(setTimeout(() => {
+          setShowButton(true);
+        }, 2000));
+      } else {
+        // Non-last lines: index 0 = 4s, index 1 = 3s
+        const displayTime = index === 0 ? 4000 : 3000;
+        timeouts.push(setTimeout(() => {
+          setShowEndingLine(false);
+          timeouts.push(setTimeout(() => {
+            showNextEnding(index + 1);
+          }, 800));
+        }, displayTime));
+      }
+    };
+
+    timeouts.push(setTimeout(() => {
+      showNextEnding(0);
+    }, 500));
+
+    return () => timeouts.forEach(clearTimeout);
+  }, [phase]);
 
   /* ═══════════════════ RENDER ═══════════════════ */
+
+  const isDark = phase === 'ending';
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#1a2e1a' }}>
@@ -264,7 +355,7 @@ export default function ChildRoom3() {
         )}
       </AnimatePresence>
 
-      {/* ===== PHASE: CAMPUS + DIALOG + ENDING ===== */}
+      {/* ===== CAMPUS + CARDS + ENDING ===== */}
       <AnimatePresence>
         {phase !== 'travel' && (
           <motion.div
@@ -281,7 +372,7 @@ export default function ChildRoom3() {
                 alt="大学校园"
                 className="w-full h-full object-cover"
                 style={{
-                  filter: cardsDone ? 'brightness(0.5) blur(2px)' : 'brightness(1)',
+                  filter: isDark ? 'brightness(0.35) blur(2px)' : 'brightness(1)',
                   transition: 'filter 2s ease',
                 }}
                 draggable={false}
@@ -306,19 +397,21 @@ export default function ChildRoom3() {
               />
             ))}
 
-            {/* White overlay for dialog phases */}
+            {/* White overlay for dialog + cards phases */}
             <AnimatePresence>
-              {(phase === 'dialog' || phase === 'dialog-cards') && (
+              {(phase === 'dialog' || phase === 'cards') && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
                   className="absolute inset-0 z-20"
                   style={{ background: 'rgba(255, 255, 255, 0.6)' }}
                 />
               )}
             </AnimatePresence>
 
-            {/* ═══ DIALOG: Typewriter ═══ */}
+            {/* ═══ TYPEWRITER ═══ */}
             <AnimatePresence>
               {phase === 'dialog' && showTypewriter && (
                 <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
@@ -340,48 +433,56 @@ export default function ChildRoom3() {
               )}
             </AnimatePresence>
 
-            {/* ═══ DIALOG: Cards ═══ */}
-            {phase === 'dialog-cards' && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6 gap-6">
-                <FadeParagraph lines={DIALOG_CARDS[0]} visible={showCard0} delay={0} />
-                <FadeParagraph lines={DIALOG_CARDS[1]} visible={showCard1} delay={0} />
-                <FadeParagraph lines={DIALOG_CARDS[2]} visible={showCard2} delay={0} />
+            {/* ═══ GLASS CARDS ═══ */}
+            {phase === 'cards' && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
+                <GlassCard lines={DIALOG_CARDS[cardIndex]} visible={showCard} fadeDelay={cardIndex === 0 ? 0.5 : 0} />
               </div>
             )}
 
-            {/* ═══ ENDING PHASE ═══ */}
+            {/* ═══ ENDING: Dark background + white text + button ═══ */}
             <AnimatePresence>
               {phase === 'ending' && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   transition={{ duration: 1.2 }}
-                  className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6"
+                  className="absolute inset-0 z-30 flex items-center justify-center px-6"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5, duration: 1 }}
-                    className="flex flex-col items-center"
-                  >
-                    <p className="font-display text-[22px] text-white mb-8 text-center" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                      对话内容等待添加...
-                    </p>
-                    <motion.button
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1, duration: 0.8 }}
-                      className="px-6 py-3 rounded-full font-body text-[15px] font-bold text-white"
-                      style={{
-                        background: 'linear-gradient(135deg, #8FB883 0%, #7EA872 100%)',
-                        boxShadow: '0 4px 12px rgba(143, 184, 131, 0.35)',
-                      }}
-                      onClick={() => navigate('/', { state: { buildingOpen: true } })}
-                    >
-                      回到日历
-                    </motion.button>
-                  </motion.div>
+                  {/* Text centered, button absolutely positioned below - never moves text */}
+                  <div className="relative" style={{ width: '100%', maxWidth: 400, height: 220 }}>
+                    {/* Ending text lines - fixed at top center */}
+                    <div className="absolute inset-x-0 top-0 flex items-start justify-center">
+                      {endingIndex < ENDING_LINES.length && (
+                        <EndingText
+                          lines={ENDING_LINES[endingIndex]}
+                          visible={showEndingLine}
+                        />
+                      )}
+                    </div>
+
+                    {/* Back button - fixed at bottom center, opacity fade only */}
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-center" style={{ height: 60 }}>
+                      <AnimatePresence>
+                        {showButton && (
+                          <motion.button
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 1, ease: [0.25, 0.1, 0.25, 1] }}
+                            className="px-8 py-3.5 rounded-full font-body text-[16px] font-bold text-white"
+                            style={{
+                              background: 'linear-gradient(135deg, #8FB883 0%, #7EA872 100%)',
+                              boxShadow: '0 4px 16px rgba(143, 184, 131, 0.4)',
+                            }}
+                            onClick={() => navigate('/', { state: { buildingOpen: true } })}
+                          >
+                            回到日历
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
