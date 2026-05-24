@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router';
 import Layout from '../components/Layout';
 import DayPopup from '../components/DayPopup';
 import { triggerConfetti } from '../lib/confetti';
@@ -114,7 +115,7 @@ function CalendarWindow({
         type: 'spring',
         damping: 20,
         stiffness: 300,
-        delay: isVisible ? 0.8 + index * 0.06 : 0,
+        delay: isVisible ? 0.4 + index * 0.05 : 0,
       }}
       onClick={() => onTap(day)}
       className="relative flex items-center justify-center rounded-2xl border-[2.5px] border-blue-dark cursor-pointer transition-shadow duration-300 hover:shadow-glow active:scale-95"
@@ -190,6 +191,7 @@ function TapHint({ visible, onDismiss }: { visible: boolean; onDismiss: () => vo
 /* ══════════════════════════ HOME ══════════════════════════ */
 
 export default function Home() {
+  const location = useLocation();
   const [buildingState, setBuildingState] = useState<BuildingState>('closed');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [hintVisible, setHintVisible] = useState(true);
@@ -198,6 +200,14 @@ export default function Home() {
 
   const stars = useRef<StarData[]>(generateStars()).current;
 
+  // If navigated from child-room with buildingOpen flag, show opened state
+  useEffect(() => {
+    if (location.state?.buildingOpen) {
+      setBuildingState('opened');
+      setHintVisible(false);
+    }
+  }, [location.state]);
+
   /* ───── handlers ───── */
 
   const handleBuildingTap = useCallback(() => {
@@ -205,15 +215,15 @@ export default function Home() {
     setHintVisible(false);
     setBuildingState('opening');
 
-    // Confetti at 600ms
+    // Confetti at 200ms - early burst as building starts opening
     setTimeout(() => {
       triggerConfetti();
-    }, 600);
+    }, 200);
 
-    // Transition to opened
+    // Transition to opened - date page fades in right after confetti
     setTimeout(() => {
       setBuildingState('opened');
-    }, 1200);
+    }, 1000);
   }, [buildingState]);
 
   const handleCloseBuilding = useCallback(() => {
@@ -221,7 +231,7 @@ export default function Home() {
     setBuildingState('closing');
     setTimeout(() => {
       setBuildingState('closed');
-    }, 1000);
+    }, 500);
   }, [buildingState]);
 
   const handleWindowTap = useCallback((day: number) => {
@@ -238,12 +248,9 @@ export default function Home() {
 
   /* ───── derived state ───── */
 
-  const isBuildingVisible = buildingState === 'closed' || buildingState === 'opening';
-  const isWindowsVisible = buildingState === 'opening' || buildingState === 'opened' || buildingState === 'closing';
   const showCloseButton = buildingState === 'opened';
   const showHintButton = buildingState === 'closed';
-  const isLeftRightVisible = buildingState === 'opening' || buildingState === 'closing';
-  const isLeftRightOpen = buildingState === 'opening' || buildingState === 'opened';
+  const isLeftRightVisible = buildingState !== 'closed';
 
   /* ───── animation classes ───── */
 
@@ -261,18 +268,12 @@ export default function Home() {
         ? 'rotateY(78deg) translateX(30px)'
         : 'rotateY(0deg) translateX(0)';
 
-  const transitionStyle: React.CSSProperties =
+  const halfTransition =
     buildingState === 'opening'
-      ? {
-          transition: 'transform 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-          willChange: 'transform',
-        }
+      ? 'transform 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
       : buildingState === 'closing'
-        ? {
-            transition: 'transform 1s cubic-bezier(0.25, 0.1, 0.25, 1)',
-            willChange: 'transform',
-          }
-        : {};
+        ? 'transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)'
+        : 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)';
 
   /* ═══════════════════════ render ═══════════════════════ */
 
@@ -350,10 +351,10 @@ export default function Home() {
           <AnimatePresence>
             {buildingState === 'closed' && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 1 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.15 }}
                 className="absolute inset-0 cursor-pointer"
                 onClick={handleBuildingTap}
               >
@@ -368,59 +369,66 @@ export default function Home() {
           </AnimatePresence>
 
           {/* ── Split Animation State: left/right halves ── */}
-          {isLeftRightVisible && (
-            <div className="absolute inset-0 perspective-1200">
-              <div className="relative w-full h-full preserve-3d">
-                {/* Left half */}
-                <div
-                  className="absolute left-0 top-0 w-1/2 h-full overflow-visible"
-                  style={{
-                    transformOrigin: 'left center',
-                    transform: leftHalfTransform,
-                    ...transitionStyle,
-                  }}
-                >
-                  <img
-                    src="/building-left-half.png"
-                    alt="Building left half"
-                    className="w-[200%] h-full object-cover object-left"
-                    style={{ maxWidth: 'none' }}
-                    draggable={false}
-                  />
-                </div>
+          <AnimatePresence>
+            {isLeftRightVisible && (
+              <motion.div
+                className="absolute inset-0 perspective-1200"
+                initial={false}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.1 }}
+                style={{ pointerEvents: 'none' }}
+              >
+                <div className="relative w-full h-full preserve-3d">
+                  {/* Left half */}
+                  <div
+                    className="absolute left-0 top-0 w-1/2 h-full overflow-visible"
+                    style={{
+                      transformOrigin: 'left center',
+                      transform: leftHalfTransform,
+                      transition: halfTransition,
+                      willChange: 'transform',
+                    }}
+                  >
+                    <img
+                      src="/building-left-half.png"
+                      alt="Building left half"
+                      className="w-full h-full object-contain object-right"
+                      draggable={false}
+                    />
+                  </div>
 
-                {/* Right half */}
-                <div
-                  className="absolute right-0 top-0 w-1/2 h-full overflow-visible"
-                  style={{
-                    transformOrigin: 'right center',
-                    transform: rightHalfTransform,
-                    ...transitionStyle,
-                  }}
-                >
-                  <img
-                    src="/building-right-half.png"
-                    alt="Building right half"
-                    className="w-[200%] h-full object-cover object-right"
-                    style={{ maxWidth: 'none' }}
-                    draggable={false}
-                  />
+                  {/* Right half */}
+                  <div
+                    className="absolute right-0 top-0 w-1/2 h-full overflow-visible"
+                    style={{
+                      transformOrigin: 'right center',
+                      transform: rightHalfTransform,
+                      transition: halfTransition,
+                      willChange: 'transform',
+                    }}
+                  >
+                    <img
+                      src="/building-right-half.png"
+                      alt="Building right half"
+                      className="w-full h-full object-contain object-left"
+                      draggable={false}
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* ── Opened State: window grid ── */}
           <AnimatePresence>
             {(buildingState === 'opened' || buildingState === 'opening') && (
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{
-                  opacity: buildingState === 'opened' ? 1 : 0,
-                }}
+                animate={{ opacity: 1 }}
                 transition={{
-                  duration: 0.4,
-                  delay: buildingState === 'opening' ? 0.7 : 0,
+                  duration: 0.6,
+                  delay: 0.3,
                 }}
                 className="absolute inset-0 flex flex-col items-center justify-center"
               >
@@ -441,7 +449,7 @@ export default function Home() {
                       day={day}
                       index={index}
                       onTap={handleWindowTap}
-                      isVisible={buildingState === 'opened'}
+                      isVisible={buildingState === 'opening' || buildingState === 'opened'}
                     />
                   ))}
                 </div>
