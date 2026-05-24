@@ -50,15 +50,25 @@ const themes: Record<string, {
     navigateTo: '/child-room-2',
     buttonText: '走进教室 听听青春',
   },
-  // Day 4: Warm gold theme
+  // Day 4: Yellow theme - Shanghai street
   '4': {
+    titleColor: '#8B6914',
+    quoteColor: '#E9C46A',
+    buttonBg: 'linear-gradient(135deg, #E9C46A 0%, #D4A840 100%)',
+    buttonShadow: '0 4px 12px rgba(233, 196, 106, 0.35)',
+    dividerColor: 'bg-yellow-soft',
+    navigateTo: '/child-room-4',
+    buttonText: '出发吧',
+  },
+  // Day 7: Warm gold theme - Letter to RAY (popup only, no experience page)
+  '7': {
     titleColor: '#7A6040',
     quoteColor: '#D4A574',
     buttonBg: 'linear-gradient(135deg, #D4A574 0%, #C49360 100%)',
     buttonShadow: '0 4px 12px rgba(212, 165, 116, 0.35)',
     dividerColor: 'bg-gold',
-    navigateTo: '/child-room-4',
-    buttonText: '打开这封信',
+    navigateTo: '/',
+    buttonText: '收起这封信',
   },
   // Day 3: Green theme - University years
   '3': {
