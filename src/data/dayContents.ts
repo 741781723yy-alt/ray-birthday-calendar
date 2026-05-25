@@ -93,10 +93,10 @@ export const dayContents: DayContent[] = [
   {
     day: 6,
     date: '6\u67086\u65E5',
-    contentType: 'candle',
-    title: '\u8BB8\u4E2A\u613F\u5427\uFF01',
-    subtitle: '\u5BF9\u7740\u624B\u673A\u5439\u6C14\uFF0C\u5439\u706D\u8721\u70DB',
-    candleCount: 5,
+    contentType: 'text',
+    title: '',
+    message: '\u4ECA\u5929\u8981\u8BA9\u65F6\u95F4\u5FEB\u8FDB\u4E00\u4E0B\uFF0C\n\n\u7EC8\u4E8E\u8F6E\u5230\u6211\u767B\u573A\u4E86\u3002',
+    signature: '',
   },
   {
     day: 7,

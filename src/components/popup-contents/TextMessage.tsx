@@ -50,6 +50,16 @@ const themes: Record<string, {
     navigateTo: '/child-room-2',
     buttonText: '走进教室 听听青春',
   },
+  // Day 6: Orange theme - Office
+  '6': {
+    titleColor: '#B8651A',
+    quoteColor: '#E9A44A',
+    buttonBg: 'linear-gradient(135deg, #E9A44A 0%, #D4883A 100%)',
+    buttonShadow: '0 4px 12px rgba(233, 164, 74, 0.35)',
+    dividerColor: 'bg-orange',
+    navigateTo: '/child-room-6',
+    buttonText: '出发吧',
+  },
   // Day 5: Light blue theme - Leeds
   '5': {
     titleColor: '#4A7FB5',

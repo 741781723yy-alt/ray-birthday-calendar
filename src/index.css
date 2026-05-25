@@ -73,3 +73,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ═══════════════ 3D Sketchbook FlipBook Styles ═══════════════ */
+
+/* 拍立得入场 */
+.polaroid-in {
+  animation: polaroid-pop 0.4s ease both;
+}
+@keyframes polaroid-pop {
+  from { opacity: 0; transform: scale(0.5) rotate(var(--r, 0deg)); }
+  to { opacity: 1; }
+}
+
+/* 文字入场 */
+.text-fade-in {
+  animation: text-appear 0.5s ease both;
+}
+@keyframes text-appear {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
