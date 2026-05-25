@@ -50,6 +50,16 @@ const themes: Record<string, {
     navigateTo: '/child-room-2',
     buttonText: '走进教室 听听青春',
   },
+  // Day 5: Light blue theme - Leeds
+  '5': {
+    titleColor: '#4A7FB5',
+    quoteColor: '#7BA7D9',
+    buttonBg: 'linear-gradient(135deg, #7BA7D9 0%, #5B8EC4 100%)',
+    buttonShadow: '0 4px 12px rgba(123, 167, 217, 0.35)',
+    dividerColor: 'bg-blue-soft',
+    navigateTo: '/child-room-5',
+    buttonText: '出发吧',
+  },
   // Day 4: Yellow theme - Shanghai street
   '4': {
     titleColor: '#8B6914',

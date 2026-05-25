@@ -82,14 +82,13 @@ export const dayContents: DayContent[] = [
     message: '\u4ECA\u5929\u6211\u4EEC\u53BB\u770B\u770B\uFF0C\n\n\u66FE\u7ECF\u53EF\u80FD\u64E6\u80A9\u800C\u8FC7\u7684\u5730\u65B9\u3002',
     signature: '',
   },
-  {
+    {
     day: 5,
-    date: '6\u67085\u65E5',
-    contentType: 'video',
-    title: '\u751F\u65E5\u60CA\u559C\u89C6\u9891',
-    videoTitle: '\u751F\u65E5\u60CA\u559C\u89C6\u9891',
-    videoDescription: '\u670B\u53CB\u4EEC\u4E3A\u4F60\u7CBE\u5FC3\u51C6\u5907\u7684\u751F\u65E5\u795D\u798F\u96C6\u9526',
-    videoDuration: '1:28',
+    date: '6月5日',
+    contentType: 'text',
+    title: '',
+    message: '成年人的世界可以变得很大，\n\n今天我们去更远的地方看看。',
+    signature: '',
   },
   {
     day: 6,
