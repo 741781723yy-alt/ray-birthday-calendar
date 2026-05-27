@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
+import FlipBook from '../components/FlipBook';
 
 /* ═══════════════════════════════════════════
    ChildRoom 6 Page - 办公室（36岁）
    流程：时光穿梭 → 办公室 → 打字机 → 毛玻璃卡片 → 结尾
    ═══════════════════════════════════════════ */
 
-type Phase = 'travel' | 'office' | 'dialog' | 'dialog2' | 'cards' | 'ending';
+type Phase = 'travel' | 'office' | 'dialog' | 'dialog2' | 'cards' | 'sketchbook' | 'ending';
 
 /* ── Web Audio 音效 ── */
 let audioCtx: AudioContext | null = null;
@@ -238,9 +239,9 @@ export default function ChildRoom6() {
     const showNext = (index: number) => {
       if (index >= DIALOG_CARDS.length) {
         setShowCard(false);
-        // 卡片结束 → 直接进入 ending
+        // 卡片结束 → 进入 sketchbook
         timeouts.push(setTimeout(() => {
-          setPhase('ending');
+          setPhase('sketchbook');
         }, 1200));
         return;
       }
@@ -260,6 +261,11 @@ export default function ChildRoom6() {
 
     return () => timeouts.forEach(clearTimeout);
   }, [phase]);
+
+  // ── Sketchbook complete → ending ──
+  const handleSketchbookComplete = useCallback(() => {
+    setPhase('ending');
+  }, []);
 
   // ── Ending auto-play ──
   useEffect(() => {
@@ -282,7 +288,7 @@ export default function ChildRoom6() {
       const isLast = index === ENDING_LINES.length - 1;
 
       // 计算本段显示时长：所有行出现 + 观看时间
-      const paragraphDuration = (lines.length * LINE_GAP + 2.0) * 1000;
+      const paragraphDuration = (lines.length * LINE_GAP + 1.0) * 1000;
 
       if (isLast) {
         // 最后一段：显示完直接进按钮
@@ -290,12 +296,12 @@ export default function ChildRoom6() {
           showNextEnding(index + 1);
         }, paragraphDuration));
       } else {
-        // 非最后一段：显示完 → 淡出 → 下一段
+        // 非最后一段：显示完 → 淡出 → 等淡出完成 → 下一段
         timeouts.push(setTimeout(() => {
           setShowEndingLine(false);
           timeouts.push(setTimeout(() => {
             showNextEnding(index + 1);
-          }, 800));
+          }, 1600));
         }, paragraphDuration));
       }
     };
@@ -464,6 +470,28 @@ export default function ChildRoom6() {
                 <GlassCard lines={DIALOG_CARDS[cardIndex]} visible={showCard} />
               </div>
             )}
+
+            {/* ═══ SKETCHBOOK ═══ */}
+            <AnimatePresence>
+              {phase === 'sketchbook' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.8 }}
+                  className="absolute inset-0 z-30"
+                >
+                  {/* Dim background */}
+                  <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} />
+                  <FlipBook
+                    cover="/scrapbook-cover.svg"
+                    spreads={Array.from({ length: 5 }, (_, i) =>
+                      `/photos/day6/spread-${i + 1}.jpg`
+                    )}
+                    onComplete={handleSketchbookComplete}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* ═══ ENDING TEXT ═══ */}
             <AnimatePresence>
