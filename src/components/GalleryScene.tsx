@@ -261,13 +261,13 @@ export default function GalleryScene({ onPhotoClick, viewBoxW, cameraOffset }: G
     >
       <defs>
         <linearGradient id="wallGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#E06040" />
-          <stop offset="50%" stopColor="#E87050" />
-          <stop offset="100%" stopColor="#D85535" />
+          <stop offset="0%" stopColor="#3A3E48" />
+          <stop offset="50%" stopColor="#404450" />
+          <stop offset="100%" stopColor="#353840" />
         </linearGradient>
         <pattern id="tilePat" width="26" height="26" patternUnits="userSpaceOnUse">
-          <rect width="26" height="26" fill="#D0D0D0" />
-          <rect x="0.6" y="0.6" width="24.8" height="24.8" fill="#F5F5F5" rx="0.3" />
+          <rect width="26" height="26" fill="#B8B8B8" />
+          <rect x="0.6" y="0.6" width="24.8" height="24.8" fill="#E8E8E8" rx="0.3" />
         </pattern>
       </defs>
 
@@ -275,20 +275,20 @@ export default function GalleryScene({ onPhotoClick, viewBoxW, cameraOffset }: G
         {/* Wall */}
         <rect x="0" y="0" width={wallW} height="662" fill="url(#wallGrad)" />
         {/* Baseboard */}
-        <rect x="0" y="660" width={wallW} height="7" fill="#B84530" />
-        <rect x="0" y="660" width={wallW} height="2" fill="#D06048" />
+        <rect x="0" y="660" width={wallW} height="7" fill="#2A2D34" />
+        <rect x="0" y="660" width={wallW} height="2" fill="#4A4D54" />
         {/* Floor shadow */}
-        <rect x="0" y="666" width={wallW} height="12" fill="rgba(0,0,0,0.08)" />
+        <rect x="0" y="666" width={wallW} height="12" fill="rgba(0,0,0,0.15)" />
         {/* Floor */}
         <rect x="0" y="666" width={wallW} height="134" fill="url(#tilePat)" />
         {/* Ceiling molding */}
-        <rect x="0" y="0" width={wallW} height="8" fill="#C84830" />
-        <rect x="0" y="8" width={wallW} height="3" fill="#B83C28" />
-        <rect x="0" y="11" width={wallW} height="2" fill="#D86048" />
+        <rect x="0" y="0" width={wallW} height="8" fill="#2A2D34" />
+        <rect x="0" y="8" width={wallW} height="3" fill="#22252A" />
+        <rect x="0" y="11" width={wallW} height="2" fill="#4A4D54" />
 
         {/* Spotlights */}
         {Array.from({ length: Math.ceil(wallW / 80) }).map((_, i) => (
-          <ellipse key={`spot-${i}`} cx={40 + i * 80} cy="2" rx="30" ry="160" fill={`rgba(255,255,255,${0.06 + (i % 2) * 0.03})`} />
+          <ellipse key={`spot-${i}`} cx={40 + i * 80} cy="2" rx="30" ry="180" fill={`rgba(255,245,230,${0.08 + (i % 2) * 0.04})`} />
         ))}
 
         {/* All photo frames */}
@@ -324,9 +324,9 @@ export default function GalleryScene({ onPhotoClick, viewBoxW, cameraOffset }: G
             key={`light-${slot.id}`}
             cx={slot.x - GROW + (slot.w + GROW * 2) / 2}
             cy={slot.y - GROW - 2}
-            rx={slot.w * 0.45}
-            ry={slot.h * 0.8}
-            fill="rgba(255,255,240,0.05)"
+            rx={slot.w * 0.5}
+            ry={slot.h * 0.9}
+            fill="rgba(255,245,220,0.08)"
           />
         ))}
       </g>
