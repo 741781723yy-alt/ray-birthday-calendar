@@ -5,6 +5,7 @@ import VideoPlayer from './VideoPlayer';
 import VoiceMessages from './VoiceMessages';
 import CandleBlow from './CandleBlow';
 import MemoryTimeline from './MemoryTimeline';
+import Envelope from './Envelope';
 
 interface ContentRouterProps {
   day: number;
@@ -36,6 +37,8 @@ export default function ContentRouter({ day }: ContentRouterProps) {
       return <CandleBlow content={content} />;
     case 'timeline':
       return <MemoryTimeline content={content} />;
+    case 'envelope':
+      return <Envelope content={content} />;
     default:
       return (
         <div className="flex flex-col items-center justify-center py-10">

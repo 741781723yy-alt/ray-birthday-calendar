@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
 
@@ -42,10 +42,8 @@ interface Song {
 }
 
 const SONGS: Song[] = [
-  { id: 1, title: '海阔天空', artist: '杨玥', duration: '3:42', cover: '/album-cover-1.jpg', src: '/song-1.mp3' },
-  { id: 2, title: '下一站天后', artist: '杨玥', duration: '4:15', cover: '/album-cover-2.jpg', src: '/song-2.mp3' },
-  { id: 3, title: '遇见', artist: '杨玥', duration: '3:28', cover: '/album-cover-3.jpg', src: '/song-3.mp3' },
-  { id: 4, title: '月牙湾', artist: '杨玥', duration: '3:56', cover: '/album-cover-4.jpg', src: '/song-4.mp3' },
+  { id: 1, title: '下一站天后', artist: '杨玥', duration: '1:15', cover: '/album-cover-1.jpg', src: '/song-1.m4a' },
+  { id: 2, title: '月牙湾', artist: '杨玥', duration: '1:23', cover: '/album-cover-2.jpg', src: '/song-2.m4a' },
 ];
 
 /* ── 对话文案 ── */
@@ -148,6 +146,55 @@ function IpodPlayer({ songs }: { songs: Song[] }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const currentSong = songs[currentIndex];
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 切歌时加载新音频
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(currentSong.src);
+    audioRef.current = audio;
+    setProgress(0);
+
+    audio.addEventListener('ended', () => {
+      // 自动下一首
+      setCurrentIndex((i) => (i + 1) % songs.length);
+    });
+
+    if (isPlaying) {
+      audio.play().catch(() => {});
+    }
+
+    return () => {
+      audio.pause();
+      audio.removeEventListener('ended', () => {});
+    };
+  }, [currentIndex, currentSong.src, songs.length]);
+
+  // 播放/暂停
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying]);
+
+  // 进度条实时更新
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const update = () => {
+      if (audio.duration) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+      }
+    };
+    audio.addEventListener('timeupdate', update);
+    return () => audio.removeEventListener('timeupdate', update);
+  }, [currentIndex]);
 
   const togglePlay = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -155,31 +202,16 @@ function IpodPlayer({ songs }: { songs: Song[] }) {
   }, []);
   const nextSong = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
+    setIsPlaying(true);
     setCurrentIndex((i) => (i + 1) % songs.length);
     setProgress(0);
   }, [songs.length]);
   const prevSong = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
+    setIsPlaying(true);
     setCurrentIndex((i) => (i - 1 + songs.length) % songs.length);
     setProgress(0);
   }, [songs.length]);
-
-  // Auto next song when progress reaches 100%
-  useEffect(() => {
-    if (progress >= 100) {
-      setCurrentIndex((i) => (i + 1) % songs.length);
-      setProgress(0);
-    }
-  }, [progress, songs.length]);
-
-  // Simulate progress when playing
-  useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      setProgress((p) => p + 0.3);
-    }, 100);
-    return () => clearInterval(interval);
-  }, [isPlaying]);
 
   return (
     <motion.div

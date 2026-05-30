@@ -90,6 +90,16 @@ const themes: Record<string, {
     navigateTo: '/child-room-7',
     buttonText: '出发吧',
   },
+  // Day 8: Brown theme - File Cabinet
+  '8': {
+    titleColor: '#6B4A2E',
+    quoteColor: '#C49A6C',
+    buttonBg: 'linear-gradient(135deg, #C49A6C 0%, #A87D52 100%)',
+    buttonShadow: '0 4px 12px rgba(196, 154, 108, 0.35)',
+    dividerColor: 'bg-orange',
+    navigateTo: '/child-room-8',
+    buttonText: '打开档案柜',
+  },
   // Day 3: Green theme - University years
   '3': {
     titleColor: '#4A6741',
@@ -108,7 +118,17 @@ const themes: Record<string, {
     buttonShadow: '0 4px 12px rgba(143, 184, 131, 0.35)',
     dividerColor: 'bg-green-soft',
     navigateTo: '/child-room-10',
-    buttonText: '回顾这段旅程',
+    buttonText: '出发',
+  },
+  // Day 12: Gold theme - Birthday!
+  '12': {
+    titleColor: '#8B6914',
+    quoteColor: '#C49A6C',
+    buttonBg: 'linear-gradient(135deg, #E9C46A 0%, #D4A84A 100%)',
+    buttonShadow: '0 4px 12px rgba(233, 196, 106, 0.35)',
+    dividerColor: 'bg-gold-soft',
+    navigateTo: '/child-room-12',
+    buttonText: '收礼物啦',
   },
 };
 

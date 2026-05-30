@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import Layout from '../components/Layout';
 import DayPopup from '../components/DayPopup';
 import { triggerConfetti } from '../lib/confetti';
@@ -589,7 +589,262 @@ export default function Home() {
       </div>
 
       {/* ===== Popup ===== */}
-      <DayPopup day={selectedDay} onClose={handleClosePopup} />
+      {selectedDay === 11 ? (
+        <Day11Envelope onClose={handleClosePopup} />
+      ) : (
+        <DayPopup day={selectedDay} onClose={handleClosePopup} />
+      )}
     </Layout>
+  );
+}
+
+/* ═══════════════════ Day 11 信封全屏 ═══════════════════ */
+
+/* 漂浮的小装饰元素 */
+const FLOATING_DECO = [
+  { x: 12, y: 18, size: 6, type: 'star', delay: 0 },
+  { x: 88, y: 25, size: 5, type: 'star', delay: 1.2 },
+  { x: 22, y: 72, size: 4, type: 'sparkle', delay: 0.6 },
+  { x: 78, y: 68, size: 5, type: 'star', delay: 2.0 },
+  { x: 35, y: 10, size: 3, type: 'sparkle', delay: 1.5 },
+  { x: 65, y: 82, size: 4, type: 'star', delay: 0.8 },
+  { x: 8, y: 55, size: 3, type: 'sparkle', delay: 1.8 },
+  { x: 92, y: 48, size: 4, type: 'star', delay: 0.3 },
+];
+
+function FloatingDecor() {
+  return (
+    <>
+      {FLOATING_DECO.map((d, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            opacity: [0.15, 0.5, 0.15],
+            y: [0, -6, 0],
+          }}
+          transition={{
+            duration: 3 + i * 0.3,
+            delay: d.delay,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          style={{
+            position: 'absolute',
+            left: `${d.x}%`,
+            top: `${d.y}%`,
+          }}
+        >
+          {d.type === 'star' ? (
+            <svg width={d.size * 3} height={d.size * 3} viewBox="0 0 20 20">
+              <path
+                d="M10 2 L12 8 L18 8 L13 12 L15 18 L10 14 L5 18 L7 12 L2 8 L8 8 Z"
+                fill="#E9D88C"
+                opacity="0.6"
+              />
+            </svg>
+          ) : (
+            <svg width={d.size * 2} height={d.size * 2} viewBox="0 0 12 12">
+              <path d="M6 0 L7 5 L12 6 L7 7 L6 12 L5 7 L0 6 L5 5 Z" fill="#E9D88C" opacity="0.5" />
+            </svg>
+          )}
+        </motion.div>
+      ))}
+    </>
+  );
+}
+
+function Day11Envelope({ onClose }: { onClose: () => void }) {
+  const [stage, setStage] = useState<'closed' | 'open' | 'letter'>('closed');
+
+  const handleOpen = () => {
+    if (stage !== 'closed') return;
+    // 流程：点击 → 淡化到图2（打开信封）→ 短暂停留 → 转场跳到信纸
+    setStage('open');
+    // 图2展示2秒后转场到信纸
+    setTimeout(() => {
+      setStage('letter');
+    }, 1500);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.6 }}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{
+        background: 'linear-gradient(170deg, #fffdf8 0%, #fef9f2 40%, #fdf5ec 100%)',
+      }}
+    >
+      {/* 漂浮装饰 */}
+      <FloatingDecor />
+
+      {/* 月亮 */}
+      <motion.div
+        animate={{ opacity: [0.12, 0.2, 0.12] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ position: 'absolute', top: '6%', right: '10%' }}
+      >
+        <svg width="48" height="48" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="18" fill="#F5E6C8" opacity="0.5" />
+          <circle cx="30" cy="20" r="16" fill="#fffdf8" opacity="0.8" />
+        </svg>
+      </motion.div>
+
+      {/* ═══ 内容叠加层：图1、图2、信纸全在同一位置，叠画切换 ═══ */}
+      <div style={{ position: 'relative', width: 310, minHeight: 310, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+        {/* 图1 关闭信封 */}
+        <motion.img
+          src="/assets/envelope-closed.png"
+          alt="关闭的信封"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: stage === 'closed' ? 1 : 0 }}
+          transition={{ duration: 0.8, ease: 'easeInOut' }}
+          onClick={handleOpen}
+          style={{
+            position: 'absolute',
+            width: 280,
+            height: 280,
+            objectFit: 'contain',
+            cursor: stage === 'closed' ? 'pointer' : 'default',
+            zIndex: stage === 'closed' ? 2 : 0,
+          }}
+        />
+
+        {/* 图2 打开信封 */}
+        <motion.img
+          src="/assets/envelope-open.png"
+          alt="打开的信封"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: stage === 'open' ? 1 : 0 }}
+          transition={{ duration: 0.8, ease: 'easeInOut' }}
+          style={{
+            position: 'absolute',
+            width: 280,
+            height: 280,
+            objectFit: 'contain',
+            pointerEvents: stage === 'open' ? 'auto' : 'none',
+            zIndex: stage === 'open' ? 2 : 0,
+          }}
+        />
+
+        {/* 点击提示 */}
+        {stage === 'closed' && (
+          <motion.div
+            animate={{ opacity: [0.25, 0.6, 0.25] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            style={{
+              position: 'absolute',
+              bottom: -30,
+              width: '100%',
+              textAlign: 'center',
+              fontFamily: 'Quicksand, sans-serif',
+              fontSize: 14,
+              color: '#c8b8a8',
+              letterSpacing: '0.05em',
+              zIndex: 3,
+            }}
+          >
+            轻轻打开 ✨
+          </motion.div>
+        )}
+
+        {/* 信纸 - 和信封图叠画切换 */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: stage === 'letter' ? 1 : 0 }}
+          transition={{ duration: 0.8, ease: 'easeInOut' }}
+          style={{
+            width: '100%',
+            position: 'relative',
+            borderRadius: 18,
+            background: 'linear-gradient(175deg, #fffef9 0%, #fef9f2 50%, #fdf5ec 100%)',
+            padding: '40px 30px 32px',
+            boxShadow: '0 16px 48px rgba(200,180,160,0.18), 0 2px 8px rgba(200,180,160,0.1), inset 0 1px 0 rgba(255,255,255,0.9)',
+            overflow: 'hidden',
+            pointerEvents: stage === 'letter' ? 'auto' : 'none',
+          }}
+        >
+          {/* 信纸纹理 */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: `repeating-linear-gradient(0deg, transparent, transparent 26px, rgba(210,195,175,0.1) 26px, rgba(210,195,175,0.1) 27px)`,
+            pointerEvents: 'none',
+          }} />
+
+          {/* 角落花朵装饰 */}
+          <svg style={{ position: 'absolute', top: 8, right: 12, opacity: 0.12 }} width="28" height="28" viewBox="0 0 28 28">
+            <circle cx="14" cy="10" r="4" fill="#e8a8a8" />
+            <circle cx="10" cy="16" r="4" fill="#e8a8a8" />
+            <circle cx="18" cy="16" r="4" fill="#e8a8a8" />
+            <circle cx="14" cy="14" r="2.5" fill="#f0c0c0" />
+          </svg>
+          <svg style={{ position: 'absolute', bottom: 12, left: 10, opacity: 0.1 }} width="22" height="22" viewBox="0 0 22 22">
+            <path d="M11 2 Q15 8 11 14 Q7 8 11 2" fill="#c8b8a8" />
+            <path d="M5 11 Q11 7 17 11 Q11 15 5 11" fill="#c8b8a8" />
+          </svg>
+
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+            {/* 小信封图标 */}
+            <svg width="32" height="28" viewBox="0 0 32 28" style={{ margin: '0 auto 16px' }}>
+              <rect x="2" y="4" width="28" height="20" rx="3" fill="none" stroke="#d4bea4" strokeWidth="1.5" />
+              <path d="M2 7 L16 16 L30 7" fill="none" stroke="#d4bea4" strokeWidth="1.5" />
+            </svg>
+
+            <p style={{
+              fontFamily: 'Quicksand, sans-serif',
+              fontSize: 22,
+              fontWeight: 700,
+              color: '#8B6A50',
+              marginBottom: 20,
+              letterSpacing: '0.08em',
+            }}>
+              邀请函
+            </p>
+            <p style={{
+              fontFamily: 'Quicksand, sans-serif',
+              fontSize: 15,
+              lineHeight: 2.2,
+              color: '#6a5a4a',
+              margin: 0,
+              textAlign: 'left',
+            }}>
+              TO：世界上最可爱的RAY小姐<br /><br />
+              明天就是你的生日啦～我想正式向你发出约会邀请：<br /><br />
+              6月12日 晚上7点，如果你有空的话，邀请你来我家吃饭～<br />
+              如果不方便，我们就换个时间。<br /><br />
+              不着急回复～
+            </p>
+          </div>
+
+          {/* 回到日历按钮 */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.5 }}
+            onClick={onClose}
+            style={{
+              display: 'block',
+              margin: '32px auto 0',
+              padding: '10px 28px',
+              borderRadius: 20,
+              border: '1px solid rgba(180,160,140,0.2)',
+              background: 'linear-gradient(135deg, #f7ece0, #f2e4d2)',
+              color: '#8B6A50',
+              fontSize: 14,
+              fontWeight: 600,
+              fontFamily: 'Quicksand, sans-serif',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(200,180,160,0.15)',
+              letterSpacing: '0.03em',
+            }}
+          >
+            回到日历
+          </motion.button>
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }

@@ -1,721 +1,951 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, Component } from 'react';
+import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
+import { subscribeWishes, addWish, updateWish, deleteWish, type Wish } from '../lib/wishes';
+
+/* ── Error Boundary ── */
+interface EBState { hasError: boolean; error?: Error }
+class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  state: EBState = { hasError: false };
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, color: '#fff', background: '#080c1a', minHeight: '100vh' }}>
+          <p>加载出错了</p>
+          <p style={{ fontSize: 12, opacity: 0.5 }}>{this.state.error?.message}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /* ═══════════════════════════════════════════
-   Child Room 10 Page - 十天倒计时回顾
-   秋日森林 · 回忆 · 感恩 · 温暖
+   ChildRoom 10 - 星空许愿
+   星空背景 + 愿望星星 + 写愿望 + Firebase 同步
    ═══════════════════════════════════════════ */
 
-type Phase = 'travel' | 'forest' | 'dialog' | 'collect' | 'ending';
+const LS_NAME = 'wish-author-name';
+const LS_ID = 'wish-author-id';
+const OWNER_ID = '__owner__';
 
-/* ── Web Audio 音效 ── */
-let audioCtx: AudioContext | null = null;
+/* ── 我（作者）的愿望，硬编码 ── */
+const MY_WISHES: Wish[] = [
+  { id: 'my-1', text: '还想一起去徒步，这次肯定不会摔跤了！', authorName: '杨玥', authorId: OWNER_ID, starX: 18, starY: 22, createdAt: 0 },
+  { id: 'my-2', text: '天气好的时候，一起出门散步。下雨天，就呆在家里，窝在沙发上。', authorName: '杨玥', authorId: OWNER_ID, starX: 72, starY: 18, createdAt: 0 },
+  { id: 'my-3', text: '海岛、草原、雨林、沙漠、冰川…想和你去环游世界，我们一起看更多风景，体验不一样的生活～', authorName: '杨玥', authorId: OWNER_ID, starX: 45, starY: 14, createdAt: 0 },
+  { id: 'my-4', text: '想带你去体验一次芭蕾课。舞蹈的魅力，希望你也可以感受到。', authorName: '杨玥', authorId: OWNER_ID, starX: 30, starY: 40, createdAt: 0 },
+  { id: 'my-5', text: '希望你每天都可以睡到自然醒，醒来以后看到第一个人就是我～', authorName: '杨玥', authorId: OWNER_ID, starX: 80, starY: 38, createdAt: 0 },
+  { id: 'my-6', text: '一起去看一场烟花，一定会很浪漫。', authorName: '杨玥', authorId: OWNER_ID, starX: 55, starY: 35, createdAt: 0 },
+  { id: 'my-7', text: '等你70岁的时候，我们还要抱着睡觉～', authorName: '杨玥', authorId: OWNER_ID, starX: 22, starY: 55, createdAt: 0 },
+  { id: 'my-8', text: '想陪你过很多很多生日，多到数都数不过来了。不知道那时候，我还能给你准备什么惊喜呐哈哈哈', authorName: '杨玥', authorId: OWNER_ID, starX: 68, starY: 52, createdAt: 0 },
+  { id: 'my-9', text: '想和你共用衣橱，买很多好看的衣服～每天都把你打扮成我喜欢的样子出门哈哈哈哈', authorName: '杨玥', authorId: OWNER_ID, starX: 50, starY: 48, createdAt: 0 },
+  { id: 'my-10', text: '等我们老了以后，还要听你叫我小港都～我要做你一辈子的小港都咯～', authorName: '杨玥', authorId: OWNER_ID, starX: 38, starY: 60, createdAt: 0 },
+];
 
-function getAudioCtx() {
-  if (!audioCtx) audioCtx = new AudioContext();
-  return audioCtx;
-}
-
-function playTickSound() {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(1200, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.02);
-    gain.gain.setValueAtTime(0.06, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.03);
-  } catch { /* ignore */ }
-}
-
-function playChimeSound() {
-  try {
-    const ctx = getAudioCtx();
-    // 柔和的三音阶铃声
-    const notes = [523, 659, 784]; // C5, E5, G5
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.15);
-      gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + i * 0.15 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.8);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.8);
+/* ── 生成背景小星星 ── */
+const STAR_COLORS = ['#fff', '#fff', '#fff', '#cce5ff', '#ffeedd', '#ffd6d6'];
+function generateBgStars(count: number) {
+  const stars: { x: number; y: number; size: number; delay: number; dur: number; color: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 1 + Math.random() * 2,
+      delay: Math.random() * 5,
+      dur: 2 + Math.random() * 3,
+      color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
     });
-  } catch { /* ignore */ }
+  }
+  return stars;
 }
 
-/* ── 心形叶子飘落的初始数据 ── */
-const HEART_LEAVES = [
-  { emoji: '🍃', angle: -70, dist: 90, delay: 0, size: 26 },
-  { emoji: '🍂', angle: -40, dist: 120, delay: 0.08, size: 28 },
-  { emoji: '💚', angle: -10, dist: 100, delay: 0.03, size: 24 },
-  { emoji: '🍁', angle: 20, dist: 110, delay: 0.12, size: 30 },
-  { emoji: '🍃', angle: 50, dist: 85, delay: 0.06, size: 22 },
-  { emoji: '💚', angle: 80, dist: 95, delay: 0.15, size: 26 },
-  { emoji: '🍂', angle: 110, dist: 105, delay: 0.09, size: 24 },
-  { emoji: '🍁', angle: 140, dist: 80, delay: 0.05, size: 28 },
-  { emoji: '💚', angle: 170, dist: 115, delay: 0.11, size: 22 },
-  { emoji: '🍃', angle: -100, dist: 88, delay: 0.07, size: 26 },
-  { emoji: '🍂', angle: -130, dist: 98, delay: 0.14, size: 24 },
-  { emoji: '🍁', angle: -160, dist: 75, delay: 0.02, size: 28 },
-];
-
-/* ── 对话文案 ── */
-const DIALOG_CARDS: string[][] = [
-  ['这十天里，我们一起走过了时光的长廊。', '从5岁的童真到15岁的青春，', '每一段记忆都如此珍贵。'],
-  ['感谢你的每一天，', '感谢你的每一次笑容。', '这个世界因为有你而变得更加美好。'],
-  ['还有最后两天，', '最特别的惊喜正在等着你。', '生日快乐，亲爱的RAY！'],
-];
-
-/* ═══════════════════ 打字机效果 ═══════════════════ */
-
-function TypewriterText({ text, speed = 80, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
-  const [displayed, setDisplayed] = useState('');
-  const [cursorVisible, setCursorVisible] = useState(true);
-
-  useEffect(() => {
-    setDisplayed('');
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx++;
-      setDisplayed(text.slice(0, idx));
-      playTickSound();
-      if (idx >= text.length) {
-        clearInterval(interval);
-        onComplete?.();
-      }
-    }, speed);
-    return () => clearInterval(interval);
-  }, [text, speed, onComplete]);
-
-  useEffect(() => {
-    const blink = setInterval(() => setCursorVisible((v) => !v), 500);
-    return () => clearInterval(blink);
-  }, []);
-
-  return (
-    <span className="font-display text-[28px] leading-[1.8]" style={{ color: '#4A6741' }}>
-      {displayed}
-      <span style={{ opacity: cursorVisible ? 1 : 0, transition: 'opacity 0.2s', color: '#8FB883' }}>|</span>
-    </span>
-  );
+function generateBrightStars(count: number) {
+  const stars: { x: number; y: number; size: number; delay: number; dur: number; color: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * 100,
+      y: Math.random() * 80,
+      size: 2.5 + Math.random() * 2,
+      delay: Math.random() * 4,
+      dur: 3 + Math.random() * 4,
+      color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+    });
+  }
+  return stars;
 }
 
-/* ═══════════════════ 逐句淡入段落 ═══════════════════ */
+const BG_STARS = generateBgStars(120);
+const BRIGHT_STARS = generateBrightStars(15);
 
-function FadeParagraph({
-  lines,
-  onComplete,
-  visible,
-}: {
-  lines: string[];
-  onComplete?: () => void;
-  visible: boolean;
-}) {
-  return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          {lines.map((line, i) => (
-            <motion.p
-              key={i}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: i * 1.8 }}
-              className="font-body text-[17px] leading-[2.2]"
-              style={{ color: '#2D3748' }}
-              onAnimationComplete={i === lines.length - 1 ? onComplete : undefined}
-            >
-              {line}
-            </motion.p>
-          ))}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+/* ── 为新愿望生成不重叠的星星位置 ── */
+function randomStarPos(existing: Wish[]): { x: number; y: number } {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const x = 10 + Math.random() * 80;
+    const y = 12 + Math.random() * 55;
+    const tooClose = existing.some(
+      (w) => Math.hypot(w.starX - x, w.starY - y) < 10,
+    );
+    if (!tooClose) return { x, y };
+  }
+  return { x: 10 + Math.random() * 80, y: 12 + Math.random() * 55 };
 }
 
-/* ═══════════════════ 秋日森林背景 ═══════════════════ */
-
-function AutumnForestBackground() {
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      {/* 秋日天空渐变 */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: 'linear-gradient(180deg, #F5D0A9 0%, #F8E4C6 30%, #EDE4D3 60%, #D4E4C4 100%)',
-        }}
-      />
-
-      {/* 温暖的太阳光晕 */}
-      <div
-        className="absolute rounded-full pointer-events-none"
-        style={{
-          top: '5%',
-          right: '15%',
-          width: 100,
-          height: 100,
-          background: 'radial-gradient(circle, rgba(255,220,150,0.5) 0%, rgba(255,200,120,0.2) 40%, transparent 70%)',
-          animation: 'sun-glow 6s ease-in-out infinite',
-        }}
-      />
-
-      {/* 远山轮廓 */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          bottom: '25%',
-          left: 0,
-          right: 0,
-          height: '30%',
-          background: 'linear-gradient(180deg, transparent 0%, rgba(176, 196, 160, 0.3) 50%, rgba(143, 184, 131, 0.4) 100%)',
-          clipPath: 'polygon(0% 100%, 0% 60%, 15% 40%, 30% 55%, 45% 35%, 60% 50%, 75% 30%, 90% 45%, 100% 25%, 100% 100%)',
-        }}
-      />
-
-      {/* 森林轮廓 - 三角形树木 */}
-      <div className="absolute bottom-0 left-0 right-0 pointer-events-none" style={{ height: '40%' }}>
-        {/* 后排树木（较暗、较小） */}
-        {[
-          { left: '5%', bottom: '30%', size: 50, color: 'rgba(126, 168, 114, 0.6)' },
-          { left: '18%', bottom: '25%', size: 65, color: 'rgba(107, 150, 95, 0.55)' },
-          { left: '32%', bottom: '32%', size: 45, color: 'rgba(126, 168, 114, 0.5)' },
-          { left: '48%', bottom: '28%', size: 70, color: 'rgba(100, 145, 88, 0.6)' },
-          { left: '62%', bottom: '35%', size: 40, color: 'rgba(126, 168, 114, 0.5)' },
-          { left: '75%', bottom: '22%', size: 60, color: 'rgba(107, 150, 95, 0.55)' },
-          { left: '88%', bottom: '30%', size: 55, color: 'rgba(100, 145, 88, 0.5)' },
-        ].map((tree, i) => (
-          <div
-            key={`back-${i}`}
-            className="absolute"
-            style={{
-              left: tree.left,
-              bottom: tree.bottom,
-              width: 0,
-              height: 0,
-              borderLeft: `${tree.size / 2}px solid transparent`,
-              borderRight: `${tree.size / 2}px solid transparent`,
-              borderBottom: `${tree.size}px solid ${tree.color}`,
-            }}
-          />
-        ))}
-
-        {/* 前排树木（较大、较亮） */}
-        {[
-          { left: '-5%', bottom: '10%', size: 100, color: 'rgba(74, 103, 65, 0.7)' },
-          { left: '12%', bottom: '5%', size: 130, color: 'rgba(84, 118, 73, 0.75)' },
-          { left: '28%', bottom: '12%', size: 90, color: 'rgba(74, 103, 65, 0.65)' },
-          { left: '42%', bottom: '0%', size: 150, color: 'rgba(64, 95, 56, 0.8)' },
-          { left: '58%', bottom: '8%', size: 110, color: 'rgba(74, 103, 65, 0.7)' },
-          { left: '72%', bottom: '15%', size: 85, color: 'rgba(84, 118, 73, 0.65)' },
-          { left: '85%', bottom: '5%', size: 120, color: 'rgba(64, 95, 56, 0.75)' },
-          { left: '95%', bottom: '10%', size: 100, color: 'rgba(74, 103, 65, 0.7)' },
-        ].map((tree, i) => (
-          <div
-            key={`front-${i}`}
-            className="absolute"
-            style={{
-              left: tree.left,
-              bottom: tree.bottom,
-              width: 0,
-              height: 0,
-              borderLeft: `${tree.size / 2}px solid transparent`,
-              borderRight: `${tree.size / 2}px solid transparent`,
-              borderBottom: `${tree.size}px solid ${tree.color}`,
-            }}
-          />
-        ))}
-
-        {/* 树干 */}
-        {[
-          { left: '47%', bottom: '0%', width: 10, height: 40, color: 'rgba(120, 95, 75, 0.6)' },
-          { left: '17%', bottom: '0%', width: 8, height: 30, color: 'rgba(120, 95, 75, 0.5)' },
-          { left: '90%', bottom: '0%', width: 9, height: 35, color: 'rgba(120, 95, 75, 0.55)' },
-        ].map((trunk, i) => (
-          <div
-            key={`trunk-${i}`}
-            className="absolute"
-            style={{
-              left: trunk.left,
-              bottom: trunk.bottom,
-              width: trunk.width,
-              height: trunk.height,
-              background: trunk.color,
-              borderRadius: 2,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* 地面草地 */}
-      <div
-        className="absolute bottom-0 left-0 right-0 pointer-events-none"
-        style={{
-          height: '12%',
-          background: 'linear-gradient(180deg, rgba(143, 184, 131, 0.5) 0%, rgba(126, 168, 114, 0.7) 100%)',
-        }}
-      />
-
-      {/* 飘落的树叶 */}
-      {[...Array(6)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute pointer-events-none"
-          style={{
-            width: 10 + i * 3,
-            height: 10 + i * 3,
-            borderRadius: i % 2 === 0 ? '50% 0 50% 0' : '0 50% 0 50%',
-            background: i % 3 === 0
-              ? `rgba(200, 140, 80, ${0.4 + i * 0.05})`
-              : i % 3 === 1
-                ? `rgba(180, 120, 60, ${0.35 + i * 0.05})`
-                : `rgba(143, 184, 131, ${0.4 + i * 0.05})`,
-            top: `${-10 - i * 12}%`,
-            left: `${10 + i * 16}%`,
-            animation: `leaf-fall ${6 + i * 1.5}s linear infinite`,
-            animationDelay: `${i * 2}s`,
-          }}
-        />
-      ))}
-
-      {/* 微风中的草丛摇曳 */}
-      {[...Array(8)].map((_, i) => (
-        <div
-          key={`grass-${i}`}
-          className="absolute pointer-events-none"
-          style={{
-            bottom: `${3 + (i % 3) * 3}%`,
-            left: `${5 + i * 12}%`,
-            width: 3,
-            height: 12 + (i % 4) * 4,
-            background: `rgba(126, 168, 114, ${0.3 + (i % 3) * 0.1})`,
-            borderRadius: '50% 50% 0 0',
-            transformOrigin: 'bottom center',
-            animation: `grass-sway ${3 + i * 0.5}s ease-in-out infinite`,
-            animationDelay: `${i * 0.3}s`,
-          }}
-        />
-      ))}
-    </div>
+/* ── 获取/创建本地身份 ── */
+function makeId(): string {
+  return 'xxxx-xxxx-xxxx'.replace(/x/g, () =>
+    ((Math.random() * 16) | 0).toString(16),
   );
+}
+function getLocalId(): string {
+  let id = localStorage.getItem(LS_ID);
+  if (!id) {
+    id = makeId();
+    localStorage.setItem(LS_ID, id);
+  }
+  return id;
 }
 
 /* ═══════════════════ 主组件 ═══════════════════ */
 
 export default function ChildRoom10() {
+  return (
+    <ErrorBoundary>
+      <StarryWishPage />
+    </ErrorBoundary>
+  );
+}
+
+function StarryWishPage() {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState<Phase>('travel');
-  const [travelProgress, setTravelProgress] = useState(0);
+  const [dbWishes, setDbWishes] = useState<Wish[]>([]);
+  const [userName, setUserName] = useState(() => localStorage.getItem(LS_NAME) || '');
+  const [showNameDialog, setShowNameDialog] = useState(() => !localStorage.getItem(LS_NAME));
+  const [showIntro, setShowIntro] = useState(true);
+  const [activeBubble, setActiveBubble] = useState<string | null>(null);
+  const [inputText, setInputText] = useState('');
+  const [flyingWish, setFlyingWish] = useState<{ x: number; y: number; text: string } | null>(null);
+  const localId = useMemo(() => getLocalId(), []);
 
-  // Dialog sub-states
-  const [showTypewriter, setShowTypewriter] = useState(false);
-  const [showCard0, setShowCard0] = useState(false);
-  const [showCard1, setShowCard1] = useState(false);
-  const [showCard2, setShowCard2] = useState(false);
-  const [showCollectButton, setShowCollectButton] = useState(false);
+  /* ── 合并：硬编码愿望 + Firestore 实时数据 ── */
+  const wishes = useMemo(() => [...MY_WISHES, ...dbWishes], [dbWishes]);
 
-  // Collect & ending states
-  const [showHeartLeaves, setShowHeartLeaves] = useState(false);
-  const [showEnding, setShowEnding] = useState(false);
-
-  // ── Phase 1: Time travel ──
+  /* ── Firestore 实时监听（只监听别人许的愿望） ── */
   useEffect(() => {
-    if (phase !== 'travel') return;
-    let frame: number;
-    const start = performance.now();
-    const duration = 1500;
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      setTravelProgress(progress);
-      if (progress < 1) {
-        frame = requestAnimationFrame(tick);
-      } else {
-        setPhase('forest');
-      }
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [phase]);
-
-  // ── Forest click → dialog ──
-  const handleForestClick = useCallback(() => {
-    if (phase === 'forest') {
-      setPhase('dialog');
-      setTimeout(() => setShowTypewriter(true), 500);
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = subscribeWishes(setDbWishes);
+    } catch (e) {
+      console.error('Firestore 订阅失败:', e);
     }
-  }, [phase]);
-
-  // ── Typewriter done → fade out → cards ──
-  const handleTypewriterDone = useCallback(() => {
-    setTimeout(() => {
-      setShowTypewriter(false);
-      setShowCard0(true);
-    }, 2000);
+    return () => unsub?.();
   }, []);
 
-  // ── Card chain ──
-  const handleCard0Done = useCallback(() => {
-    setTimeout(() => {
-      setShowCard0(false);
-      setTimeout(() => setShowCard1(true), 800);
-    }, 1200);
+  /* ── 保存名字 ── */
+  const handleSaveName = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    localStorage.setItem(LS_NAME, trimmed);
+    setUserName(trimmed);
+    setShowNameDialog(false);
   }, []);
 
-  const handleCard1Done = useCallback(() => {
-    setTimeout(() => {
-      setShowCard1(false);
-      setTimeout(() => setShowCard2(true), 800);
-    }, 1200);
-  }, []);
-
-  const handleCard2Done = useCallback(() => {
-    setTimeout(() => {
-      setShowCollectButton(true);
-    }, 1500);
-  }, []);
-
-  // ── Click collect → heart leaves → ending ──
-  const handleCollectMemories = useCallback(() => {
-    playChimeSound();
-    setShowCollectButton(false);
-    setShowCard2(false);
-    setPhase('collect');
-    setTimeout(() => {
-      setShowHeartLeaves(true);
-      setTimeout(() => setShowEnding(true), 1200);
-    }, 100);
-  }, []);
-
-  /* ═══════════════════ RENDER ═══════════════════ */
+  /* ── 提交愿望 ── */
+  const handleSubmit = useCallback(async () => {
+    const text = inputText.trim();
+    if (!text || !userName) return;
+    const pos = randomStarPos(wishes);
+    setInputText('');
+    setFlyingWish({ x: pos.x, y: pos.y, text });
+    // 延迟写入，等动画播放
+    setTimeout(async () => {
+      try {
+        await addWish(text, userName, localId, pos.x, pos.y);
+      } catch (e) {
+        console.error('写入愿望失败:', e);
+      }
+      setFlyingWish(null);
+    }, 1700);
+  }, [inputText, userName, localId, wishes]);
 
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ background: '#1a1a2e' }}>
-      {/* ===== PHASE: TIME TRAVEL ===== */}
+    <div className="fixed inset-0 overflow-hidden" style={{ background: '#080c1a' }} onClick={() => setActiveBubble(null)}>
+      {/* ── 星空背景 ── */}
+      <StarryBackground />
+
+      {/* ── 愿望星星 ── */}
+      {wishes.map((wish) => (
+        <WishStar
+          key={wish.id}
+          wish={wish}
+          isOpen={activeBubble === wish.id}
+          isFixed={wish.authorId === OWNER_ID}
+          isOwn={wish.authorId === localId}
+          onToggle={() =>
+            setActiveBubble((prev) => (prev === wish.id ? null : wish.id))
+          }
+          onClose={() => setActiveBubble(null)}
+        />
+      ))}
+
+      {/* ── 飞星动画 ── */}
+      {flyingWish && <FlyingStar target={flyingWish} />}
+
+      {/* ── 底部输入区 ── */}
+      {!showNameDialog && (
+        <WishInput
+          value={inputText}
+          onChange={setInputText}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {/* ── 返回按钮 ── */}
+      <button
+        onClick={() => navigate('/ending')}
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 16,
+          zIndex: 50,
+          background: 'rgba(255,255,255,0.12)',
+          border: 'none',
+          borderRadius: 20,
+          padding: '6px 14px',
+          color: 'rgba(255,255,255,0.6)',
+          fontSize: 13,
+          fontFamily: 'Quicksand, sans-serif',
+          cursor: 'pointer',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+        }}
+      >
+        继续
+      </button>
+
+      {/* ── 入场卡片 ── */}
       <AnimatePresence>
-        {phase === 'travel' && (
-          <motion.div
-            className="absolute inset-0 z-50 flex items-center justify-center"
-            style={{ background: '#0f1f0f' }}
-          >
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                filter: `blur(${travelProgress * 4}px)`,
-                transform: `scale(${1 + travelProgress * 0.3})`,
-              }}
-            >
-              {[...Array(6)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute rounded-full"
-                  style={{
-                    width: 60 + i * 50,
-                    height: 60 + i * 50,
-                    border: '2px solid rgba(143, 184, 131, 0.4)',
-                    animation: `spin ${2 + i * 0.5}s linear infinite ${i % 2 === 0 ? '' : 'reverse'}`,
-                    opacity: 1 - travelProgress * 0.5,
-                    boxShadow: '0 0 20px rgba(143, 184, 131, 0.2), inset 0 0 20px rgba(180, 220, 160, 0.1)',
-                  }}
-                />
-              ))}
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: 100 + travelProgress * 200,
-                  height: 100 + travelProgress * 200,
-                  background: `radial-gradient(circle, rgba(143,184,131,${0.3 + travelProgress * 0.4}) 0%, rgba(200,160,100,${travelProgress * 0.2}) 40%, transparent 70%)`,
-                }}
-              />
-            </div>
-            <motion.p
-              className="absolute font-display text-[18px] z-10"
-              style={{ color: '#C8E0B8' }}
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              时光穿梭中...
-            </motion.p>
-          </motion.div>
+        {showIntro && !showNameDialog && (
+          <IntroCard onClose={() => setShowIntro(false)} />
         )}
       </AnimatePresence>
 
-      {/* ===== PHASE: FOREST + DIALOG + COLLECT + ENDING ===== */}
+      {/* ── 名字弹窗 ── */}
       <AnimatePresence>
-        {phase !== 'travel' && (
+        {showNameDialog && <NameDialog onSave={handleSaveName} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ═══════════════════ 星空背景 ═══════════════════ */
+
+function StarryBackground() {
+  return (
+    <div className="absolute inset-0" style={{ overflow: 'hidden' }}>
+      {/* 渐变天空 */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(180deg, #050816 0%, #0a1128 20%, #0f1a3a 40%, #162050 60%, #0d1530 80%, #080c1a 100%)',
+        }}
+      />
+      {/* 银河带 */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '130%',
+          height: '30%',
+          top: '5%',
+          left: '-15%',
+          background:
+            'linear-gradient(90deg, transparent 0%, rgba(100,120,200,0.03) 20%, rgba(140,130,200,0.06) 40%, rgba(160,140,180,0.04) 60%, rgba(100,120,200,0.03) 80%, transparent 100%)',
+          transform: 'rotate(-15deg)',
+          filter: 'blur(30px)',
+        }}
+      />
+      {/* 星云 */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '50%',
+          height: '35%',
+          top: '8%',
+          left: '10%',
+          background:
+            'radial-gradient(ellipse, rgba(80,100,200,0.1) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          width: '45%',
+          height: '30%',
+          top: '25%',
+          right: '5%',
+          background:
+            'radial-gradient(ellipse, rgba(140,80,180,0.08) 0%, transparent 70%)',
+          filter: 'blur(50px)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          width: '35%',
+          height: '25%',
+          top: '15%',
+          left: '40%',
+          background:
+            'radial-gradient(ellipse, rgba(60,120,180,0.06) 0%, transparent 70%)',
+          filter: 'blur(35px)',
+        }}
+      />
+      {/* 小星星 */}
+      {BG_STARS.map((s, i) => (
+        <div
+          key={`s${i}`}
+          style={{
+            position: 'absolute',
+            left: `${s.x}%`,
+            top: `${s.y}%`,
+            width: s.size,
+            height: s.size,
+            borderRadius: '50%',
+            background: s.color,
+            opacity: 0.5,
+            boxShadow: `0 0 ${s.size * 2}px ${s.color}40`,
+            animation: `twinkle ${s.dur}s ease-in-out ${s.delay}s infinite alternate`,
+          }}
+        />
+      ))}
+      {/* 亮星（十字光芒） */}
+      {BRIGHT_STARS.map((s, i) => (
+        <div
+          key={`b${i}`}
+          style={{
+            position: 'absolute',
+            left: `${s.x}%`,
+            top: `${s.y}%`,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <div
+            style={{
+              width: s.size,
+              height: s.size,
+              borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size * 4}px ${s.color}, 0 0 ${s.size * 8}px ${s.color}50`,
+              animation: `twinkle ${s.dur}s ease-in-out ${s.delay}s infinite alternate`,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: s.size * 6,
+              height: 1,
+              background: `linear-gradient(90deg, transparent, ${s.color}80, transparent)`,
+              animation: `twinkle ${s.dur}s ease-in-out ${s.delay}s infinite alternate`,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 1,
+              height: s.size * 6,
+              background: `linear-gradient(180deg, transparent, ${s.color}80, transparent)`,
+              animation: `twinkle ${s.dur}s ease-in-out ${s.delay}s infinite alternate`,
+            }}
+          />
+        </div>
+      ))}
+      {/* 流星 */}
+      <ShootingStars />
+      <style>{`
+        @keyframes twinkle {
+          0% { opacity: 0.15; transform: scale(0.7); }
+          100% { opacity: 1; transform: scale(1.15); }
+        }
+        @keyframes shooting {
+          0% { opacity: 1; transform: rotate(-35deg) translateX(0); }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: rotate(-35deg) translateX(-300px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ── 流星组件 ── */
+function ShootingStars() {
+  const [meteors, setMeteors] = useState<{ id: number; x: number; y: number; dur: number; len: number; delay: number }[]>([]);
+
+  useEffect(() => {
+    let nextId = 0;
+    const spawn = () => {
+      const id = nextId++;
+      const m = {
+        id,
+        x: 10 + Math.random() * 70,
+        y: Math.random() * 40,
+        dur: 0.8 + Math.random() * 0.6,
+        len: 60 + Math.random() * 80,
+        delay: 0,
+      };
+      setMeteors((prev) => [...prev, m]);
+      setTimeout(() => {
+        setMeteors((prev) => prev.filter((x) => x.id !== id));
+      }, (m.dur + 0.1) * 1000);
+    };
+    // 第一颗延迟2秒出现
+    const first = setTimeout(spawn, 2000);
+    // 之后每3-8秒随机一颗
+    const interval = setInterval(() => {
+      spawn();
+    }, 3000 + Math.random() * 5000);
+    return () => { clearTimeout(first); clearInterval(interval); };
+  }, []);
+
+  return (
+    <>
+      {meteors.map((m) => (
+        <div
+          key={m.id}
+          style={{
+            position: 'absolute',
+            left: `${m.x}%`,
+            top: `${m.y}%`,
+            width: m.len,
+            height: 1.5,
+            borderRadius: 1,
+            background: 'linear-gradient(270deg, transparent, rgba(200,220,255,0.4), rgba(255,255,255,0.9))',
+            boxShadow: '0 0 6px rgba(200,220,255,0.5)',
+            animation: `shooting ${m.dur}s linear forwards`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+/* ═══════════════════ 愿望星星 ═══════════════════ */
+
+function WishStar({
+  wish,
+  isOpen,
+  isFixed,
+  isOwn,
+  onToggle,
+  onClose,
+}: {
+  wish: Wish;
+  isOpen: boolean;
+  isFixed: boolean;
+  isOwn: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(wish.text);
+
+  const [saveError, setSaveError] = useState(false);
+
+  const handleSave = () => {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    setSaveError(false);
+    setEditing(false);
+    updateWish(wish.id, trimmed).catch((e) => {
+      console.error('修改愿望失败:', e);
+    });
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteWish(wish.id);
+      onClose();
+    } catch (e) {
+      console.error('删除愿望失败:', e);
+    }
+  };
+
+  return (
+    <>
+      {/* 星星本体 */}
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        style={{
+          position: 'absolute',
+          left: `${wish.starX}%`,
+          top: `${wish.starY}%`,
+          transform: 'translate(-50%, -50%)',
+          zIndex: 20,
+          cursor: 'pointer',
+        }}
+      >
+        <div
+          style={{
+            width: isOpen ? 16 : 10,
+            height: isOpen ? 16 : 10,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #fff 0%, #E9D88C 40%, transparent 70%)',
+            boxShadow: isOpen
+              ? '0 0 20px 6px rgba(233,216,140,0.6), 0 0 40px 10px rgba(233,216,140,0.2)'
+              : '0 0 12px 4px rgba(233,216,140,0.4), 0 0 24px 6px rgba(233,216,140,0.15)',
+            animation: `star-pulse ${2.5 + (wish.starX % 3)}s ease-in-out infinite alternate`,
+            transition: 'all 0.3s ease',
+          }}
+        />
+      </motion.div>
+
+      {/* 愿望气泡 */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 4 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              left: wish.starX > 60 ? undefined : `${wish.starX}%`,
+              right: wish.starX > 60 ? `${100 - wish.starX}%` : undefined,
+              top: wish.starY > 45 ? undefined : `${wish.starY + 6}%`,
+              bottom: wish.starY > 45 ? `${100 - wish.starY + 4}%` : undefined,
+              transform: wish.starX > 60 ? undefined : 'translateX(-50%)',
+              zIndex: 30,
+              maxWidth: 240,
+              minWidth: 140,
+              background: 'rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              borderRadius: 16,
+              padding: '14px 18px',
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            }}
+          >
+            {editing ? (
+              <>
+                <input
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  maxLength={100}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(233,216,140,0.4)',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontFamily: 'Quicksand, sans-serif',
+                    outline: 'none',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button
+                    onClick={handleSave}
+                    disabled={!editText.trim()}
+                    style={{
+                      flex: 1,
+                      padding: '6px 0',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: editText.trim()
+                        ? 'linear-gradient(135deg, #E9D88C, #C8B060)'
+                        : 'rgba(255,255,255,0.1)',
+                      color: editText.trim() ? '#1a1a2e' : 'rgba(255,255,255,0.3)',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      fontFamily: 'Quicksand, sans-serif',
+                      cursor: editText.trim() ? 'pointer' : 'default',
+                    }}
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => { setEditing(false); setEditText(wish.text); }}
+                    style={{
+                      flex: 1,
+                      padding: '6px 0',
+                      borderRadius: 10,
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'transparent',
+                      color: 'rgba(255,255,255,0.5)',
+                      fontSize: 13,
+                      fontFamily: 'Quicksand, sans-serif',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    取消
+                  </button>
+                </div>
+                {saveError && (
+                  <p style={{ color: 'rgba(255,120,120,0.9)', fontSize: 12, marginTop: 8, textAlign: 'center', fontFamily: 'Quicksand, sans-serif' }}>
+                    保存失败，请重试
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p
+                  style={{
+                    fontFamily: 'Quicksand, sans-serif',
+                    fontSize: 15,
+                    lineHeight: 1.7,
+                    color: '#fff',
+                    margin: 0,
+                  }}
+                >
+                  {wish.text}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                  <p
+                    style={{
+                      fontFamily: 'Quicksand, sans-serif',
+                      fontSize: 12,
+                      color: 'rgba(255,255,255,0.45)',
+                      margin: 0,
+                    }}
+                  >
+                    — {wish.authorName}
+                  </p>
+                  {isOwn && !isFixed && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={handleDelete}
+                        style={{
+                          background: 'rgba(255,80,80,0.2)',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '3px 8px',
+                          color: 'rgba(255,120,120,0.8)',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        删除
+                      </button>
+                      <button
+                        onClick={() => setEditing(true)}
+                        style={{
+                          background: 'rgba(233,216,140,0.15)',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '3px 8px',
+                          color: 'rgba(233,216,140,0.8)',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        编辑
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/* ═══════════════════ 飞星动画 ═══════════════════ */
+
+function FlyingStar({ target }: { target: { x: number; y: number; text: string } }) {
+  return (
+    <motion.div
+      initial={{
+        left: '50%',
+        bottom: '14%',
+        scale: 1,
+        opacity: 1,
+      }}
+      animate={{
+        left: `${target.x}%`,
+        bottom: `${100 - target.y}%`,
+        scale: 0.2,
+        opacity: [1, 0.9, 0],
+      }}
+      transition={{ duration: 1.4, ease: [0.25, 0.1, 0.25, 1] }}
+      style={{
+        position: 'absolute',
+        zIndex: 25,
+        transform: 'translate(-50%, 50%)',
+      }}
+    >
+      <div
+        style={{
+          padding: '8px 16px',
+          borderRadius: 20,
+          background: 'rgba(233,216,140,0.25)',
+          border: '1px solid rgba(233,216,140,0.4)',
+          color: '#fff',
+          fontSize: 13,
+          fontFamily: 'Quicksand, sans-serif',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 0 20px rgba(233,216,140,0.3)',
+        }}
+      >
+        {target.text}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════ 底部输入区 ═══════════════════ */
+
+function WishInput({
+  value,
+  onChange,
+  onSubmit,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 40,
+        padding: '12px 16px 20px',
+        background: 'linear-gradient(transparent, rgba(8,12,26,0.9) 30%)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          background: 'rgba(255,255,255,0.08)',
+          borderRadius: 24,
+          padding: '4px 4px 4px 16px',
+          border: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        }}
+      >
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
+          placeholder="写下你的愿望..."
+          maxLength={100}
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: '#fff',
+            fontSize: 15,
+            fontFamily: 'Quicksand, sans-serif',
+          }}
+        />
+        <button
+          onClick={onSubmit}
+          disabled={!value.trim()}
+          style={{
+            padding: '8px 18px',
+            borderRadius: 20,
+            border: 'none',
+            background: value.trim()
+              ? 'linear-gradient(135deg, #E9D88C, #C8B060)'
+              : 'rgba(255,255,255,0.1)',
+            color: value.trim() ? '#1a1a2e' : 'rgba(255,255,255,0.3)',
+            fontSize: 14,
+            fontWeight: 700,
+            fontFamily: 'Quicksand, sans-serif',
+            cursor: value.trim() ? 'pointer' : 'default',
+            transition: 'all 0.3s',
+          }}
+        >
+          许愿
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════ 名字弹窗 ═══════════════════ */
+
+function NameDialog({ onSave }: { onSave: (name: string) => void }) {
+  const [name, setName] = useState('');
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-50 flex items-center justify-center px-6"
+      style={{ background: 'rgba(8,12,26,0.7)' }}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        style={{
+          width: '100%',
+          maxWidth: 300,
+          background: 'rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderRadius: 20,
+          padding: '28px 24px',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+        }}
+      >
+        <p
+          style={{
+            fontFamily: 'Quicksand, sans-serif',
+            fontSize: 17,
+            fontWeight: 700,
+            color: '#fff',
+            textAlign: 'center',
+            marginBottom: 20,
+          }}
+        >
+          你的名字是？
+        </p>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSave(name)}
+          placeholder="输入名字"
+          maxLength={20}
+          autoFocus
+          style={{
+            width: '100%',
+            padding: '10px 16px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(255,255,255,0.06)',
+            color: '#fff',
+            fontSize: 16,
+            fontFamily: 'Quicksand, sans-serif',
+            outline: 'none',
+            textAlign: 'center',
+            boxSizing: 'border-box',
+          }}
+        />
+        <button
+          onClick={() => onSave(name)}
+          disabled={!name.trim()}
+          style={{
+            width: '100%',
+            marginTop: 16,
+            padding: '10px',
+            borderRadius: 12,
+            border: 'none',
+            background: name.trim()
+              ? 'linear-gradient(135deg, #E9D88C, #C8B060)'
+              : 'rgba(255,255,255,0.08)',
+            color: name.trim() ? '#1a1a2e' : 'rgba(255,255,255,0.3)',
+            fontSize: 15,
+            fontWeight: 700,
+            fontFamily: 'Quicksand, sans-serif',
+            cursor: name.trim() ? 'pointer' : 'default',
+            transition: 'all 0.3s',
+          }}
+        >
+          开始许愿
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════ 入场卡片 ═══════════════════ */
+
+const INTRO_LINES = ['这是我们第一次看星星，', '记得许愿哦～'];
+
+function IntroCard({ onClose }: { onClose: () => void }) {
+  const [visible, setVisible] = useState(false);
+  const lastLineDelay = (INTRO_LINES.length - 1) * 1.2;
+
+  useEffect(() => {
+    const showTimer = setTimeout(() => setVisible(true), 1000);
+    return () => clearTimeout(showTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setTimeout(() => {
+      setVisible(false);
+      setTimeout(onClose, 600);
+    }, (lastLineDelay + 0.6 + 1.5) * 1000);
+    return () => clearTimeout(timer);
+  }, [visible, lastLineDelay, onClose]);
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
+      <AnimatePresence>
+        {visible && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 1.5 }}
-            className="absolute inset-0"
-            onClick={handleForestClick}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex flex-col items-center justify-center relative"
+            style={{
+              background: 'rgba(255, 253, 248, 0.45)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              borderRadius: 24,
+              boxShadow: '0 8px 32px rgba(233,216,140,0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+              padding: '24px 28px',
+              maxWidth: 340,
+              width: '100%',
+              minHeight: 120,
+            }}
           >
-            {/* 秋日森林背景 */}
-            <AutumnForestBackground />
-
-            {/* 白色遮罩层（对话阶段） */}
-            <AnimatePresence>
-              {(phase === 'dialog' || phase === 'collect') && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="absolute inset-0 z-20"
-                  style={{ background: 'rgba(255, 252, 245, 0.55)' }}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* ═══ DIALOG: Typewriter ═══ */}
-            <AnimatePresence>
-              {phase === 'dialog' && showTypewriter && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center px-6">
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="flex items-center justify-center"
-                    style={{ minHeight: 100 }}
-                  >
-                    <TypewriterText
-                      text="倒计时已经第十天了～"
-                      speed={80}
-                      onComplete={handleTypewriterDone}
-                    />
-                  </motion.div>
-                </div>
-              )}
-            </AnimatePresence>
-
-            {/* ═══ DIALOG: Glassmorphism Cards ═══ */}
-            {phase === 'dialog' && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6">
-                {/* 毛玻璃卡片容器 */}
-                <div
-                  className="relative w-full max-w-[360px] rounded-3xl px-7 py-8 text-center overflow-hidden"
-                  style={{
-                    background: 'rgba(255, 253, 248, 0.45)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                    borderRadius: 24,
-                    boxShadow: '0 8px 32px rgba(143, 184, 131, 0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
-                    minHeight: 200,
-                    opacity: (showCard0 || showCard1 || showCard2) ? 1 : 0,
-                    transition: 'opacity 0.8s ease',
-                  }}
-                >
-                  {/* 呼吸光晕 */}
-                  <div
-                    className="absolute inset-0 rounded-3xl pointer-events-none"
-                    style={{
-                      background: 'radial-gradient(ellipse at 50% 30%, rgba(180,220,160,0.15) 0%, transparent 70%)',
-                      animation: 'breathe 4s ease-in-out infinite',
-                    }}
-                  />
-
-                  {/* 文字容器 */}
-                  <div className="relative z-10 flex flex-col items-center justify-center" style={{ minHeight: 160 }}>
-                    {/* Card 1 */}
-                    <FadeParagraph
-                      lines={DIALOG_CARDS[0]}
-                      visible={showCard0}
-                      onComplete={handleCard0Done}
-                    />
-
-                    {/* Card 2 */}
-                    <FadeParagraph
-                      lines={DIALOG_CARDS[1]}
-                      visible={showCard1}
-                      onComplete={handleCard1Done}
-                    />
-
-                    {/* Card 3 */}
-                    <FadeParagraph
-                      lines={DIALOG_CARDS[2]}
-                      visible={showCard2}
-                      onComplete={handleCard2Done}
-                    />
-                  </div>
-                </div>
-
-                {/* 收集回忆按钮 */}
-                <div style={{ minHeight: 52 }}>
-                  <AnimatePresence>
-                    {showCollectButton && (
-                      <motion.button
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 1 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="relative px-7 py-3.5 rounded-full font-body text-[15px] font-bold overflow-hidden"
-                        style={{
-                          color: '#FFFFFF',
-                          background: 'linear-gradient(135deg, #8FB883 0%, #7EA872 50%, #4A6741 100%)',
-                          backdropFilter: 'blur(8px)',
-                          boxShadow: '0 4px 20px rgba(143, 184, 131, 0.4), 0 0 40px rgba(143, 184, 131, 0.15), inset 0 1px 0 rgba(255,255,255,0.3)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCollectMemories();
-                        }}
-                      >
-                        {/* 按钮光晕脉动 */}
-                        <span
-                          className="absolute inset-0 rounded-full pointer-events-none"
-                          style={{
-                            background: 'radial-gradient(circle at 50% 50%, rgba(180,220,160,0.3) 0%, transparent 70%)',
-                            animation: 'glow-pulse 3s ease-in-out infinite',
-                          }}
-                        />
-                        <span className="relative z-10">收集回忆 🍃</span>
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            )}
-
-            {/* ── COLLECT PHASE: 心形叶子飘落 ── */}
-            <AnimatePresence>
-              {(phase === 'collect' || phase === 'ending') && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-                  {showHeartLeaves &&
-                    HEART_LEAVES.map((leaf, i) => {
-                      const rad = (leaf.angle * Math.PI) / 180;
-                      const x = Math.cos(rad) * leaf.dist;
-                      const y = Math.sin(rad) * leaf.dist;
-                      return (
-                        <motion.div
-                          key={i}
-                          initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
-                          animate={{
-                            scale: [0, 1.3, 1],
-                            x,
-                            y,
-                            opacity: [1, 1, 0.8],
-                          }}
-                          transition={{
-                            duration: 0.8,
-                            delay: leaf.delay,
-                            ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
-                          }}
-                          className="absolute"
-                          style={{ fontSize: leaf.size, zIndex: 50 }}
-                        >
-                          {leaf.emoji}
-                        </motion.div>
-                      );
-                    })}
-                </div>
-              )}
-            </AnimatePresence>
-
-            {/* ── ENDING TEXT ── */}
-            <AnimatePresence>
-              {showEnding && (
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
+            <div
+              className="absolute inset-0 rounded-3xl pointer-events-none"
+              style={{
+                background: 'radial-gradient(ellipse at 50% 30%, rgba(233,216,140,0.15) 0%, transparent 70%)',
+                animation: 'breathe 4s ease-in-out infinite',
+              }}
+            />
+            <div className="relative z-10">
+              {INTRO_LINES.map((line, i) => (
+                <motion.p
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1.5, delay: 0.5 }}
-                  className="absolute inset-x-0 bottom-[8%] z-30 flex flex-col items-center justify-center px-6"
+                  transition={{ duration: 0.6, delay: i * 1.2 }}
+                  className="font-body text-[17px] leading-[2.2] text-center w-full"
+                  style={{ color: '#2D3748' }}
                 >
-                  {/* 白色卡片 */}
-                  <div
-                    className="rounded-2xl px-8 py-5 text-center"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.92)',
-                      backdropFilter: 'blur(6px)',
-                      boxShadow: '0 4px 20px rgba(74, 103, 65, 0.12)',
-                      maxWidth: 320,
-                      width: '100%',
-                    }}
-                  >
-                    <p
-                      className="font-display text-[22px] leading-[1.6] font-bold"
-                      style={{ color: '#4A6741' }}
-                    >
-                      每一段旅程都有你相伴 💚
-                    </p>
-                    <p
-                      className="font-body text-[15px] leading-[1.8] mt-3"
-                      style={{ color: '#7EA872' }}
-                    >
-                      感谢这十天的美好回忆
-                    </p>
-                  </div>
-
-                  {/* 回到日历按钮 */}
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 2 }}
-                    className="mt-6 px-6 py-3 rounded-full font-body text-[15px] font-bold text-white"
-                    style={{
-                      background: 'linear-gradient(135deg, #8FB883 0%, #4A6741 100%)',
-                      boxShadow: '0 4px 12px rgba(143, 184, 131, 0.4)',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate('/', { state: { buildingOpen: true } });
-                    }}
-                  >
-                    回到日历
-                  </motion.button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  {line}
+                </motion.p>
+              ))}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Keyframes */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes leaf-fall {
-          0% { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 0.6; }
-          100% { transform: translateY(100vh) rotate(360deg) translateX(50px); opacity: 0; }
-        }
-        @keyframes grass-sway {
-          0%, 100% { transform: rotate(-3deg); }
-          50% { transform: rotate(3deg); }
-        }
-        @keyframes sun-glow {
-          0%, 100% { opacity: 0.7; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.1); }
-        }
-        @keyframes breathe {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-        @keyframes glow-pulse {
-          0%, 100% { opacity: 0.4; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.05); }
-        }
-      `}</style>
     </div>
   );
 }
