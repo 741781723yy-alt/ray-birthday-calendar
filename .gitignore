@@ -6,3 +6,10 @@ public/originals_backup/
 public/birthday-video-original.mp4
 public/blessing-video-original.mp4
 .git-backup-before-rewrite/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

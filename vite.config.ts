@@ -3,10 +3,12 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { inspectAttr } from 'plugin-inspect-react-code'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.GITHUB_PAGES ? '/ray-birthday-calendar/' : '/',
-  plugins: [inspectAttr(), react()],
+  plugins: [inspectAttr(), react(), cloudflare()],
   server: {
     port: 3000,
   },
