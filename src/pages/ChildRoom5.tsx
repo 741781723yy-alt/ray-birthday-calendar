@@ -1,3 +1,4 @@
+import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -168,6 +169,7 @@ function EndingText({ lines, visible }: { lines: string[]; visible: boolean }) {
 
 export default function ChildRoom5() {
   const navigate = useNavigate();
+  useEffect(() => { preloadDayAssets(5); preloadNextDay(6); }, []);
   const [phase, setPhase] = useState<Phase>('travel');
   const [travelProgress, setTravelProgress] = useState(0);
 

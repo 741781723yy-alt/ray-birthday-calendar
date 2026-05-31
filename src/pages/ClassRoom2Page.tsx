@@ -1,3 +1,4 @@
+import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -336,6 +337,7 @@ function IpodPlayer({ songs }: { songs: Song[] }) {
 
 export default function ClassRoom2Page() {
   const navigate = useNavigate();
+  useEffect(() => { preloadDayAssets(2); preloadNextDay(3); }, []);
   const [phase, setPhase] = useState<Phase>('travel');
   const [travelProgress, setTravelProgress] = useState(0);
 
