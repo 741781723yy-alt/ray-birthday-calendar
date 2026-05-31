@@ -5,12 +5,14 @@
  */
 import { asset } from './assets';
 
-/* 每天的背景图 */
+/* 每天的背景图 + 关键动画素材 */
 const DAY_BACKGROUNDS = [
   asset('/child-room-night.webp'),    // Day 1
   asset('/classroom-day.webp'),       // Day 2
   asset('/university-campus.webp'),   // Day 3
   asset('/shanghai-street.webp'),     // Day 4
+  asset('/person1.webp'),             // Day 4 行走小人
+  asset('/person2.webp'),             // Day 4 行走小人
   asset('/leeds-scene.webp'),         // Day 5
   asset('/office-scene.webp'),        // Day 6
   asset('/girls-illustration.webp'),  // Day 7
