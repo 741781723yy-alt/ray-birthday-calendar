@@ -2,3 +2,6 @@ node_modules
 dist
 .DS_Store
 public/originals_backup/
+# 视频原始备份，不提交到Git
+public/birthday-video-original.mp4
+public/blessing-video-original.mp4
