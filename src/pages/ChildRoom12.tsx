@@ -832,6 +832,7 @@ function BirthdayVideoPlayer({ fading, onEnded }: { fading: boolean; onEnded: ()
       <video
         ref={ref}
         src={asset("/birthday-video.mp4")}
+        preload="none"
         playsInline
         onEnded={onEnded}
         style={{ maxWidth: '120%', maxHeight: '120%', objectFit: 'contain', position: 'relative', zIndex: 1 }}
@@ -863,6 +864,7 @@ function BlessingVideoPlayer({ onEnded }: { onEnded: () => void }) {
       <video
         ref={ref}
         src={asset("/blessing-video.mp4")}
+        preload="none"
         playsInline
         onEnded={onEnded}
         style={{ maxWidth: '120%', maxHeight: '120%', objectFit: 'contain', position: 'relative', zIndex: 1 }}

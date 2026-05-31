@@ -15,4 +15,18 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React 核心
+          'vendor-react': ['react', 'react-dom', 'react-router'],
+          // UI 库
+          'vendor-ui': ['framer-motion', 'lucide-react'],
+          // Firebase
+          'vendor-firebase': ['firebase/app', 'firebase/firestore'],
+        },
+      },
+    },
+  },
 });
