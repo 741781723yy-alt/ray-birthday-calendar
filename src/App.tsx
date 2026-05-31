@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router'
+import { useEffect } from 'react'
 import Home from './pages/Home'
 import ChildRoom from './pages/ChildRoom'
 import ClassRoom2Page from './pages/ClassRoom2Page'
@@ -12,8 +13,12 @@ import ChildRoom9 from './pages/ChildRoom9'
 import ChildRoom10 from './pages/ChildRoom10'
 import ChildRoom12 from './pages/ChildRoom12'
 import Ending from './pages/Ending'
+import { preloadAllImages } from './lib/preload'
 
 export default function App() {
+  // 应用启动后预加载所有背景图
+  useEffect(() => { preloadAllImages() }, [])
+
   return (
     <Routes>
       <Route path="/" element={<Home />} />
