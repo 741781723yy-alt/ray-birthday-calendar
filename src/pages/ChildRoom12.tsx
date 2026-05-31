@@ -191,20 +191,13 @@ export default function ChildRoom12() {
     }
   }, [phase]);
 
-  /* ─── 音乐渐弱 ─── */
+  /* ─── 蜡烛全部吹灭时立即停止BGM ─── */
   useEffect(() => {
-    if (phase === 'blessing' && bgMusicRef.current) {
-      const audio = bgMusicRef.current;
-      const fade = setInterval(() => {
-        if (audio.volume > 0.05) {
-          audio.volume = Math.max(0, audio.volume - 0.05);
-        } else {
-          audio.pause();
-          clearInterval(fade);
-        }
-      }, 100);
+    if (phase === 'blow' && candles.every((c) => !c.lit) && bgMusicRef.current) {
+      bgMusicRef.current.pause();
+      setMusicPlaying(false);
     }
-  }, [phase]);
+  }, [candles, phase]);
 
   /* ─── cake 阶段 1.5s 后进入 blow ─── */
   useEffect(() => {
