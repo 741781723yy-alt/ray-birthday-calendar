@@ -130,6 +130,16 @@ const themes: Record<string, {
     navigateTo: '/child-room-12',
     buttonText: '收礼物啦',
   },
+  // Day 9: Purple theme - Survey
+  '9': {
+    titleColor: '#7B5EA7',
+    quoteColor: '#B8A0D2',
+    buttonBg: 'linear-gradient(135deg, #B8A0D2 0%, #9B80BC 100%)',
+    buttonShadow: '0 4px 12px rgba(184, 160, 210, 0.35)',
+    dividerColor: 'bg-purple-soft',
+    navigateTo: '/child-room-9',
+    buttonText: '开始答题',
+  },
 };
 
 export default function TextMessage({ content }: TextMessageProps) {

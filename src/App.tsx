@@ -8,6 +8,7 @@ import ChildRoom5 from './pages/ChildRoom5'
 import ChildRoom6 from './pages/ChildRoom6'
 import ChildRoom7 from './pages/ChildRoom7'
 import ChildRoom8 from './pages/ChildRoom8'
+import ChildRoom9 from './pages/ChildRoom9'
 import ChildRoom10 from './pages/ChildRoom10'
 import ChildRoom12 from './pages/ChildRoom12'
 import Ending from './pages/Ending'
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/child-room-6" element={<ChildRoom6 />} />
       <Route path="/child-room-7" element={<ChildRoom7 />} />
       <Route path="/child-room-8" element={<ChildRoom8 />} />
+      <Route path="/child-room-9" element={<ChildRoom9 />} />
       <Route path="/child-room-10" element={<ChildRoom10 />} />
       <Route path="/child-room-12" element={<ChildRoom12 />} />
       <Route path="/ending" element={<Ending />} />

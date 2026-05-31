@@ -103,6 +103,7 @@ export default function ChildRoom12() {
     Array.from({ length: 3 }, (_, i) => ({ id: i, lit: true }))
   );
   const [micAccess, setMicAccess] = useState<'pending' | 'pre-granted' | 'granted' | 'denied'>('pending');
+  const [musicPlaying, setMusicPlaying] = useState(false);
 
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -117,14 +118,69 @@ export default function ChildRoom12() {
     setTimeout(() => setPhase('cake'), 1200);
   }, []);
 
-  /* ─── 背景音乐 ─── */
-  useEffect(() => {
-    if (phase === 'cake') {
-      const audio = new Audio('/birthday-music.mp3');
-      audio.loop = true;
+  /* ─── 背景音乐：在用户首次点击时预加载并"解锁" ─── */
+  const initBgMusic = useCallback(() => {
+    if (bgMusicRef.current) return;
+    const audio = new Audio(asset('/birthday-music.mp3'));
+    audio.loop = true;
+    audio.volume = 0.01;       // 非0音量播放，确保浏览器认为是"真正播放"
+    bgMusicRef.current = audio;
+    // 在用户手势中播放，"解锁"音频
+    audio.play()
+      .then(() => setMusicPlaying(true))
+      .catch(() => {});
+  }, []);
+
+  /* ─── 手动播放/切换背景音乐（用户手势中调用） ─── */
+  const toggleMusic = useCallback(async () => {
+    const audio = bgMusicRef.current;
+    if (!audio) {
+      // 还没创建就新建一个
+      const a = new Audio(asset('/birthday-music.mp3'));
+      a.loop = true;
+      a.volume = 0.5;
+      bgMusicRef.current = a;
+      try {
+        await a.play();
+        setMusicPlaying(true);
+      } catch { /* ignore */ }
+      return;
+    }
+    if (musicPlaying) {
+      audio.pause();
+      setMusicPlaying(false);
+    } else {
       audio.volume = 0.5;
-      bgMusicRef.current = audio;
-      audio.play().catch(() => {});
+      try {
+        await audio.play();
+        setMusicPlaying(true);
+      } catch { /* ignore */ }
+    }
+  }, [musicPlaying]);
+
+  /* ─── cake 阶段渐入背景音乐 ─── */
+  useEffect(() => {
+    if (phase === 'cake' && bgMusicRef.current) {
+      const audio = bgMusicRef.current;
+      // 尝试继续播放（可能被视频暂停了）
+      const tryPlay = audio.play();
+      if (tryPlay) {
+        tryPlay.then(() => {
+          setMusicPlaying(true);
+          // 渐入到 0.5
+          const fadeIn = setInterval(() => {
+            if (audio.volume < 0.45) {
+              audio.volume = Math.min(0.5, audio.volume + 0.05);
+            } else {
+              audio.volume = 0.5;
+              clearInterval(fadeIn);
+            }
+          }, 100);
+        }).catch(() => {
+          // 自动播放被拒 → 不设 musicPlaying，让浮动按钮显示
+          setMusicPlaying(false);
+        });
+      }
     }
   }, [phase]);
 
@@ -290,6 +346,7 @@ export default function ChildRoom12() {
             style={{ cursor: 'pointer' }}
             onClick={() => {
               preRequestMic(); // 在用户手势中提前获取麦克风权限
+              initBgMusic();   // 在用户手势中初始化并"解锁"背景音乐
               setPhase('video');
             }}
           >
@@ -550,6 +607,40 @@ export default function ChildRoom12() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ═══ 浮动音乐按钮（cake/blow 阶段） ═══ */}
+      {(phase === 'cake' || phase === 'blow') && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+          onClick={toggleMusic}
+          style={{
+            position: 'fixed',
+            top: 16,
+            right: 16,
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: 'none',
+            background: musicPlaying
+              ? 'rgba(184,160,210,0.6)'
+              : 'rgba(255,255,255,0.15)',
+            color: '#fff',
+            fontSize: 18,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 40,
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          }}
+          title={musicPlaying ? '暂停音乐' : '播放音乐'}
+        >
+          {musicPlaying ? '🎵' : '🔇'}
+        </motion.button>
+      )}
 
       {/* ═══ Phase 5: 祝福视频 ═══ */}
       <AnimatePresence>

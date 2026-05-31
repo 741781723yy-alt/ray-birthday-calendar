@@ -119,15 +119,11 @@ export const dayContents: DayContent[] = [
   {
     day: 9,
     date: '6\u67089\u65E5',
-    contentType: 'voice',
-    title: '\u6084\u6084\u8BDD\u65F6\u95F4',
-    subtitle: '\u4E00\u4E9B\u6084\u6084\u8BDD\uFF0C\u53EA\u8BF4\u7ED9\u4F60\u542C',
-    voiceMessages: [
-      { id: 'v4', label: '\u5077\u5077\u544A\u8BC9\u4F60', sender: '\u795E\u79D8\u670B\u53CB', duration: '0:15', timestamp: '6\u67089\u65E5' },
-      { id: 'v5', label: '\u7B11\u8BDD\u4E00\u5219', sender: '\u5F00\u5FC3\u679C', duration: '0:42', timestamp: '6\u67089\u65E5' },
-      { id: 'v6', label: '\u6211\u4EEC\u7684\u79D8\u5BC6', sender: '\u95FA\u871C', duration: '0:27', timestamp: '6\u67089\u65E5' },
-      { id: 'v7', label: '\u6700\u540E\u7684\u5C0F\u60CA\u559C', sender: '???', duration: '0:19', timestamp: '6\u67089\u65E5' },
-    ],
+    contentType: 'text',
+    title: '',
+    message:
+      '\u548C\u4F60\u76F8\u5904\u7684\u65F6\u5019\uFF0C\u6211\u53D1\u73B0\u6211\u4EEC\u8868\u8FBE\u559C\u6B22\u548C\u63A5\u53D7\u559C\u6B22\u7684\u65B9\u5F0F\u6709\u70B9\u4E0D\u4E00\u6837\u3002\n\n\u6240\u4EE5\u4ECA\u5929\uFF0C\u6211\u51C6\u5907\u4E86\u4E00\u4EFD\u5C0F\u8C03\u67E5\u95EE\u5377\u3002\n\n\u6CA1\u6709\u6807\u51C6\u7B54\u6848\u3002\u53EA\u662F\u60F3\u66F4\u4E86\u89E3\u4F60\u4E00\u70B9\u70B9\u3002',
+    signature: '',
   },
   {
     day: 10,
