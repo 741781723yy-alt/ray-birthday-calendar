@@ -191,14 +191,6 @@ export default function ChildRoom12() {
     }
   }, [phase]);
 
-  /* ─── 蜡烛全部吹灭时立即停止BGM ─── */
-  useEffect(() => {
-    if (phase === 'blow' && candles.every((c) => !c.lit) && bgMusicRef.current) {
-      bgMusicRef.current.pause();
-      setMusicPlaying(false);
-    }
-  }, [candles, phase]);
-
   /* ─── cake 阶段 1.5s 后进入 blow ─── */
   useEffect(() => {
     if (phase === 'cake') {
@@ -325,7 +317,19 @@ export default function ChildRoom12() {
   useEffect(() => {
     if (phase === 'blow' && candles.every((c) => !c.lit)) {
       stopBlowDetection();
+      // 释放麦克风
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      // 释放 AudioContext（释放音频会话，让祝福视频能播放声音）
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      // 停止 BGM
+      if (bgMusicRef.current) {
+        bgMusicRef.current.pause();
+        bgMusicRef.current = null;
+        setMusicPlaying(false);
+      }
       setVolumeLevel(0);
       setTimeout(() => {
         triggerConfetti();
@@ -809,15 +813,31 @@ function BirthdayVideoPlayer({ fading, onEnded }: { fading: boolean; onEnded: ()
 
 function BlessingVideoPlayer({ onEnded }: { onEnded: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [showUnmute, setShowUnmute] = useState(false);
+
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     v.currentTime = 0;
     v.play().catch(() => {
+      // 浏览器阻止有声播放，先静音播放
       v.muted = true;
-      v.play().catch(() => {});
+      v.play().then(() => {
+        // 静音播放成功，提示用户点击开声音
+        setShowUnmute(true);
+      }).catch(() => {});
     });
   }, []);
+
+  const handleUnmute = () => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = false;
+    setShowUnmute(false);
+    // 确保继续播放
+    v.play().catch(() => {});
+  };
+
   return (
     <motion.div
       className="absolute inset-0 z-40 flex items-center justify-center"
@@ -835,6 +855,35 @@ function BlessingVideoPlayer({ onEnded }: { onEnded: () => void }) {
         onEnded={onEnded}
         style={{ maxWidth: '120%', maxHeight: '120%', objectFit: 'contain', position: 'relative', zIndex: 1 }}
       />
+      {/* 开启声音按钮 */}
+      {showUnmute && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          onClick={handleUnmute}
+          style={{
+            position: 'absolute',
+            bottom: '15%',
+            zIndex: 10,
+            padding: '10px 24px',
+            borderRadius: 24,
+            border: 'none',
+            background: 'rgba(107,154,196,0.85)',
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: 600,
+            fontFamily: 'Quicksand, sans-serif',
+            cursor: 'pointer',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          🔊 点击开启声音
+        </motion.button>
+      )}
     </motion.div>
   );
 }
