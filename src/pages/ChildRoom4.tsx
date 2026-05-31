@@ -288,7 +288,7 @@ export default function ChildRoom4() {
             {/* Street Background */}
             <div className="absolute inset-0">
               <img
-                src={asset("/shanghai-street.jpg")}
+                src={asset("/shanghai-street.webp")}
                 alt="上海街道"
                 className="w-full h-full object-cover"
                 style={{
@@ -384,7 +384,7 @@ export default function ChildRoom4() {
                       }}
                     >
                       <motion.img
-                        src={asset("/person1.png")}
+                        src={asset("/person1.webp")}
                         alt="person1"
                         className="h-full w-auto"
                         style={{ objectFit: 'contain' }}
@@ -405,7 +405,7 @@ export default function ChildRoom4() {
                       }}
                     >
                       <motion.img
-                        src={asset("/person2.png")}
+                        src={asset("/person2.webp")}
                         alt="person2"
                         className="h-full w-auto"
                         style={{ objectFit: 'contain' }}

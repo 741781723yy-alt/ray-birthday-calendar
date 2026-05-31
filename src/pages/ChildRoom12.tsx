@@ -414,7 +414,7 @@ export default function ChildRoom12() {
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
       {/* ═══ 背景图（始终显示）═══ */}
       <img
-        src={asset("/Geburtstag.jpeg")}
+        src={asset("/Geburtstag.webp")}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         style={{ zIndex: 0 }}
@@ -828,7 +828,7 @@ function BirthdayVideoPlayer({ fading, onEnded }: { fading: boolean; onEnded: ()
       animate={{ opacity: fading ? 0 : 1 }}
       transition={{ duration: fading ? 1.2 : 0.8 }}
     >
-      <img src={asset("/Geburtstag.jpeg")} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <img src={asset("/Geburtstag.webp")} alt="" className="absolute inset-0 w-full h-full object-cover" />
       <video
         ref={ref}
         src={asset("/birthday-video.mp4")}
@@ -859,7 +859,7 @@ function BlessingVideoPlayer({ onEnded }: { onEnded: () => void }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 1 }}
     >
-      <img src={asset("/Geburtstag.jpeg")} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <img src={asset("/Geburtstag.webp")} alt="" className="absolute inset-0 w-full h-full object-cover" />
       <video
         ref={ref}
         src={asset("/blessing-video.mp4")}

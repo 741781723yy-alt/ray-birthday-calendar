@@ -305,7 +305,7 @@ export default function GalleryScene({ onPhotoClick, viewBoxW, cameraOffset }: G
               {renderFrame(s, (
                 <>
                   <image
-                    href={`/photos/day7/thumb/photo-${s.photoId ?? s.id}.jpg`}
+                    href={`/photos/day7/thumb/photo-${s.photoId ?? s.id}.webp`}
                     x={cx}
                     y={cy}
                     width={cw}

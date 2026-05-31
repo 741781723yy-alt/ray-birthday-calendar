@@ -357,7 +357,7 @@ export default function ChildRoom5() {
             {/* Leeds Background */}
             <div className="absolute inset-0">
               <img
-                src={asset("/leeds-scene.jpg")}
+                src={asset("/leeds-scene.webp")}
                 alt="英国利兹"
                 className="w-full h-full object-cover"
                 style={{

@@ -369,7 +369,7 @@ export default function ChildRoom3() {
             {/* Campus Background */}
             <div className="absolute inset-0">
               <img
-                src={asset("/university-campus.jpg")}
+                src={asset("/university-campus.webp")}
                 alt="大学校园"
                 className="w-full h-full object-cover"
                 style={{

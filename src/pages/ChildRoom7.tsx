@@ -200,7 +200,7 @@ export default function ChildRoom7() {
 
             {/* Girls overlay */}
             <img
-              src={asset("/girls-illustration.png")}
+              src={asset("/girls-illustration.webp")}
               alt="girls"
               draggable={false}
               style={{
@@ -263,7 +263,7 @@ export default function ChildRoom7() {
               }}
             >
               <img
-                src={`/photos/day7/photo-${selectedPhoto}.jpg`}
+                src={`/photos/day7/photo-${selectedPhoto}.webp`}
                 alt={`Photo ${selectedPhoto}`}
                 style={{
                   width: '100%', aspectRatio: '4/5',

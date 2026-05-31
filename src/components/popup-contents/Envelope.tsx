@@ -67,7 +67,7 @@ export default function Envelope({ content }: EnvelopeProps) {
         <AnimatePresence>
           {(stage === 'closed' || stage === 'opening') && (
             <motion.img
-              src={asset("/assets/envelope-closed.png")}
+              src={asset("/assets/envelope-closed.webp")}
               alt="关闭的信封"
               variants={envelopeVariants}
               initial="initial"
@@ -88,7 +88,7 @@ export default function Envelope({ content }: EnvelopeProps) {
         <AnimatePresence>
           {stage === 'open' && (
             <motion.img
-              src={asset("/assets/envelope-open.png")}
+              src={asset("/assets/envelope-open.webp")}
               alt="打开的信封"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}

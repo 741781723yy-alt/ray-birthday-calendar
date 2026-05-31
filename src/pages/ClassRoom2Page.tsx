@@ -43,8 +43,8 @@ interface Song {
 }
 
 const SONGS: Song[] = [
-  { id: 1, title: '下一站天后', artist: '杨玥', duration: '1:15', cover: '/album-cover-1.jpg', src: '/song-1.m4a' },
-  { id: 2, title: '月牙湾', artist: '杨玥', duration: '1:23', cover: '/album-cover-2.jpg', src: '/song-2.m4a' },
+  { id: 1, title: '下一站天后', artist: '杨玥', duration: '1:15', cover: '/album-cover-1.webp', src: '/song-1.m4a' },
+  { id: 2, title: '月牙湾', artist: '杨玥', duration: '1:23', cover: '/album-cover-2.webp', src: '/song-2.m4a' },
 ];
 
 /* ── 对话文案 ── */
@@ -224,7 +224,7 @@ function IpodPlayer({ songs }: { songs: Song[] }) {
       {/* iPod image */}
       <div className="relative" style={{ width: 380, height: 560 }}>
         <img
-          src={asset("/ipod-handdrawn.png")}
+          src={asset("/ipod-handdrawn.webp")}
           alt="iPod"
           className="w-full h-full object-contain"
           draggable={false}
@@ -494,7 +494,7 @@ export default function ClassRoom2Page() {
             {/* Classroom Background */}
             <div className="absolute inset-0">
               <img
-                src={asset("/classroom-day.jpg")}
+                src={asset("/classroom-day.webp")}
                 alt="教室"
                 className="w-full h-full object-cover"
                 style={{
