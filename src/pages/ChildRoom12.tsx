@@ -16,8 +16,15 @@ interface CandleState {
   lit: boolean;
 }
 
-/* ─── SVG 火苗（从 CandleBlow 复用，ID 加前缀避免冲突）─── */
-function Flame({ lit, x, baseY }: { lit: boolean; x: number; baseY: number }) {
+/* ─── SVG 火苗（随风晃动）─── */
+function Flame({ lit, x, baseY, wind = 0 }: {
+  lit: boolean; x: number; baseY: number; wind?: number; // wind: 0~1 音量强度
+}) {
+  // wind 越大，火苗晃动幅度越大
+  const w = Math.min(1, wind);
+  const tilt = w * 12;       // 最大倾斜 12px
+  const squeeze = 1 - w * 0.3; // 最大压缩 30%
+
   return (
     <AnimatePresence>
       {lit && (
@@ -28,31 +35,43 @@ function Flame({ lit, x, baseY }: { lit: boolean; x: number; baseY: number }) {
           transition={{ duration: 0.3 }}
           style={{ transformOrigin: `${x}px ${baseY}px` }}
         >
-          {/* 外发光 */}
+          {/* 外发光 - 随风晃动 */}
           <motion.ellipse
-            cx={x} cy={baseY - 7} rx={10} ry={16}
+            cx={x + tilt * 0.6} cy={baseY - 7}
+            rx={10 * squeeze} ry={16 - w * 4}
             fill="url(#bdFlameGlow)"
-            opacity={0.4}
-            animate={{ rx: [10, 12, 9, 11], ry: [16, 18, 14, 17] }}
-            transition={{ duration: 0.15, repeat: Infinity }}
+            opacity={0.4 + w * 0.2}
+            animate={{
+              cx: [x + tilt * 0.4, x + tilt * 0.8, x + tilt * 0.3, x + tilt * 0.6],
+              rx: [10 * squeeze, 12 * squeeze, 9 * squeeze, 11 * squeeze],
+              ry: [16 - w * 4, 18 - w * 3, 14 - w * 5, 17 - w * 4],
+            }}
+            transition={{ duration: 0.12 + (1 - w) * 0.05, repeat: Infinity }}
           />
-          {/* 主体 */}
+          {/* 主体 - 随风偏移+压缩 */}
           <motion.ellipse
-            cx={x} cy={baseY - 5} rx={5} ry={10}
+            cx={x + tilt * 0.5} cy={baseY - 5 + w * 2}
+            rx={5 * squeeze} ry={10 - w * 2}
             fill="url(#bdFlameBody)"
             animate={{
-              ry: [10, 11.5, 9.5, 10.5],
-              rx: [5, 5.5, 4.5, 5.2],
-              opacity: [0.95, 1, 0.85, 0.95],
+              cx: [x + tilt * 0.3, x + tilt * 0.7, x + tilt * 0.2, x + tilt * 0.5],
+              ry: [10 - w * 2, 11.5 - w * 3, 9.5 - w * 1, 10.5 - w * 2],
+              rx: [5 * squeeze, 5.5 * squeeze, 4.5 * squeeze, 5.2 * squeeze],
+              opacity: [0.95, 1 - w * 0.1, 0.85, 0.95],
             }}
-            transition={{ duration: 0.12, repeat: Infinity }}
+            transition={{ duration: 0.1 + (1 - w) * 0.03, repeat: Infinity }}
           />
           {/* 内核 */}
           <motion.ellipse
-            cx={x} cy={baseY - 2} rx={2.5} ry={5}
+            cx={x + tilt * 0.3} cy={baseY - 2 + w * 1.5}
+            rx={2.5 * squeeze} ry={5 - w * 1}
             fill="#FFF9F0" opacity={0.9}
-            animate={{ ry: [5, 5.5, 4.5, 5], opacity: [0.9, 1, 0.85, 0.95] }}
-            transition={{ duration: 0.1, repeat: Infinity }}
+            animate={{
+              cx: [x + tilt * 0.2, x + tilt * 0.4, x + tilt * 0.1, x + tilt * 0.3],
+              ry: [5 - w, 5.5 - w * 1.5, 4.5 - w * 0.5, 5 - w],
+              opacity: [0.9, 1 - w * 0.15, 0.85, 0.95],
+            }}
+            transition={{ duration: 0.08 + (1 - w) * 0.02, repeat: Infinity }}
           />
         </motion.g>
       )}
@@ -77,7 +96,7 @@ function SmokeWisp({ x, baseY }: { x: number; baseY: number }) {
 function playCelebrationTone() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -102,7 +121,8 @@ export default function ChildRoom12() {
   const [candles, setCandles] = useState<CandleState[]>(
     Array.from({ length: 3 }, (_, i) => ({ id: i, lit: true }))
   );
-  const [micAccess, setMicAccess] = useState<'pending' | 'pre-granted' | 'granted' | 'denied'>('pending');
+  const [micState, setMicState] = useState<'idle' | 'calibrating' | 'ready' | 'denied'>('idle');
+  const [volumeLevel, setVolumeLevel] = useState(0); // 0-1 实时音量
   const [musicPlaying, setMusicPlaying] = useState(false);
 
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -111,7 +131,7 @@ export default function ChildRoom12() {
   const streamRef = useRef<MediaStream | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const blowStartRef = useRef<number | null>(null);
-  const silentCountRef = useRef(0);
+  const thresholdRef = useRef(0.05); // 动态阈值，校准后更新
 
   /* ─── 视频播放结束 ─── */
   const handleVideoEnded = useCallback(() => {
@@ -119,32 +139,26 @@ export default function ChildRoom12() {
     setTimeout(() => setPhase('cake'), 1200);
   }, []);
 
-  /* ─── 背景音乐：在用户首次点击时预加载并"解锁" ─── */
+  /* ─── 背景音乐 ─── */
   const initBgMusic = useCallback(() => {
     if (bgMusicRef.current) return;
     const audio = new Audio(asset('/birthday-music.mp3'));
     audio.loop = true;
-    audio.volume = 0.01;       // 非0音量播放，确保浏览器认为是"真正播放"
+    audio.volume = 0.01;
     bgMusicRef.current = audio;
-    // 在用户手势中播放，"解锁"音频
     audio.play()
       .then(() => setMusicPlaying(true))
       .catch(() => {});
   }, []);
 
-  /* ─── 手动播放/切换背景音乐（用户手势中调用） ─── */
   const toggleMusic = useCallback(async () => {
     const audio = bgMusicRef.current;
     if (!audio) {
-      // 还没创建就新建一个
       const a = new Audio(asset('/birthday-music.mp3'));
       a.loop = true;
       a.volume = 0.5;
       bgMusicRef.current = a;
-      try {
-        await a.play();
-        setMusicPlaying(true);
-      } catch { /* ignore */ }
+      try { await a.play(); setMusicPlaying(true); } catch { /* ignore */ }
       return;
     }
     if (musicPlaying) {
@@ -152,10 +166,7 @@ export default function ChildRoom12() {
       setMusicPlaying(false);
     } else {
       audio.volume = 0.5;
-      try {
-        await audio.play();
-        setMusicPlaying(true);
-      } catch { /* ignore */ }
+      try { await audio.play(); setMusicPlaying(true); } catch { /* ignore */ }
     }
   }, [musicPlaying]);
 
@@ -163,12 +174,10 @@ export default function ChildRoom12() {
   useEffect(() => {
     if (phase === 'cake' && bgMusicRef.current) {
       const audio = bgMusicRef.current;
-      // 尝试继续播放（可能被视频暂停了）
       const tryPlay = audio.play();
       if (tryPlay) {
         tryPlay.then(() => {
           setMusicPlaying(true);
-          // 渐入到 0.5
           const fadeIn = setInterval(() => {
             if (audio.volume < 0.45) {
               audio.volume = Math.min(0.5, audio.volume + 0.05);
@@ -177,10 +186,7 @@ export default function ChildRoom12() {
               clearInterval(fadeIn);
             }
           }, 100);
-        }).catch(() => {
-          // 自动播放被拒 → 不设 musicPlaying，让浮动按钮显示
-          setMusicPlaying(false);
-        });
+        }).catch(() => { setMusicPlaying(false); });
       }
     }
   }, [phase]);
@@ -208,106 +214,6 @@ export default function ChildRoom12() {
     }
   }, [phase]);
 
-  /* ─── 辅助：创建 AudioContext（兼容 Safari） ─── */
-  const createAudioContext = useCallback(() => {
-    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    return new Ctor();
-  }, []);
-
-  /* ─── 辅助：配置 AnalyserNode ─── */
-  const setupAnalyser = useCallback((ctx: AudioContext, stream: MediaStream) => {
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.3;
-    analyser.minDecibels = -90;
-    analyser.maxDecibels = -10;
-    ctx.createMediaStreamSource(stream).connect(analyser);
-    return analyser;
-  }, []);
-
-  /* ─── 预请求麦克风（在第一次用户点击时调用，提前获取权限） ─── */
-  const preRequestMic = useCallback(async () => {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) return; // 非 HTTPS 或不支持
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      // 在用户手势中创建 AudioContext + 立即 resume（iOS Safari 必须）
-      const audioContext = createAudioContext();
-      audioContextRef.current = audioContext;
-      // iOS Safari 始终以 suspended 状态创建，必须 resume
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
-      }
-      const analyser = setupAnalyser(audioContext, stream);
-      analyserRef.current = analyser;
-      setMicAccess('pre-granted');
-    } catch (e) {
-      console.warn('麦克风预请求失败:', e);
-    }
-  }, [createAudioContext, setupAnalyser]);
-
-  /* ─── 吹蜡烛检测（RMS 时域，比频率域更可靠） ─── */
-  const startBlowDetection = useCallback(() => {
-    if (pollTimerRef.current) return; // 已在运行
-
-    const BLOW_RMS_THRESHOLD = 0.12;  // RMS 阈值（0~1 范围）
-    const BLOW_DURATION_MS = 400;      // 需要持续吹气的时长
-
-    pollTimerRef.current = setInterval(() => {
-      const analyser = analyserRef.current;
-      if (!analyser) return;
-
-      // 读取时域数据
-      const bufferLength = analyser.fftSize;
-      const dataArray = new Uint8Array(bufferLength);
-      analyser.getByteTimeDomainData(dataArray);
-
-      // 计算 RMS（均方根）
-      let sumSquares = 0;
-      let allSilent = true;
-      for (let i = 0; i < bufferLength; i++) {
-        const normalized = (dataArray[i] - 128) / 128; // 归一化到 -1~1
-        sumSquares += normalized * normalized;
-        if (dataArray[i] !== 128) allSilent = false;
-      }
-      const rms = Math.sqrt(sumSquares / bufferLength);
-
-      // iOS Safari 已知 bug：流突然返回全静音（全是 128）
-      // 连续 20 次 → 重建管道
-      if (allSilent) {
-        silentCountRef.current++;
-        if (silentCountRef.current > 20) {
-          silentCountRef.current = 0;
-          console.warn('检测到静音流，尝试重建音频管道...');
-          rebuildPipeline();
-          return;
-        }
-      } else {
-        silentCountRef.current = 0;
-      }
-
-      if (rms > BLOW_RMS_THRESHOLD) {
-        if (blowStartRef.current === null) {
-          blowStartRef.current = Date.now();
-        } else if (Date.now() - blowStartRef.current > BLOW_DURATION_MS) {
-          // 持续吹气达标 → 熄灭一根
-          setCandles((prev) => {
-            const remaining = prev.filter((c) => c.lit);
-            if (remaining.length > 0) {
-              return prev.map((c) =>
-                c.id === remaining[0].id ? { ...c, lit: false } : c
-              );
-            }
-            return prev;
-          });
-          blowStartRef.current = null;
-        }
-      } else {
-        blowStartRef.current = null;
-      }
-    }, 50); // 50ms 轮询，比 rAF 在移动端更稳定
-  }, []);
-
   /* ─── 停止吹气检测 ─── */
   const stopBlowDetection = useCallback(() => {
     if (pollTimerRef.current) {
@@ -316,74 +222,118 @@ export default function ChildRoom12() {
     }
   }, []);
 
-  /* ─── 重建音频管道（iOS Safari 流恢复） ─── */
-  const rebuildPipeline = useCallback(async () => {
-    stopBlowDetection();
+  /* ─── 核心：启动麦克风 + 校准 + 吹气检测（全部在一个用户手势中完成）─── */
+  const startMicAndBlow = useCallback(async () => {
     try {
-      // 关闭旧的
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-      if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
-
-      // 重建
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const ctx = createAudioContext();
-      audioContextRef.current = ctx;
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      analyserRef.current = setupAnalyser(ctx, stream);
-      startBlowDetection();
-    } catch (e) {
-      console.warn('重建音频管道失败:', e);
-      setMicAccess('denied');
-    }
-  }, [createAudioContext, setupAnalyser, startBlowDetection, stopBlowDetection]);
-
-  const requestMic = useCallback(async () => {
-    try {
-      // 如果预请求已经成功，直接复用
-      if (streamRef.current && analyserRef.current) {
-        // 检查 stream 是否还活着
-        const trackAlive = streamRef.current.getTracks().some((t) => t.readyState === 'live');
-        if (trackAlive) {
-          // 确保 AudioContext 不是 suspended
-          const ctx = audioContextRef.current;
-          if (ctx && ctx.state === 'suspended') {
-            await ctx.resume();
-          }
-          setMicAccess('granted');
-          startBlowDetection();
-          return;
+      // 1. 获取麦克风（必须在用户手势中）
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
         }
-        // stream 已死，需要重建
+      });
+      streamRef.current = stream;
+
+      // 2. 创建 AudioContext 并立即 resume（iOS Safari 必须）
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioContext = new Ctor();
+      audioContextRef.current = audioContext;
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
       }
 
-      // 全新请求
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const ctx = createAudioContext();
-      audioContextRef.current = ctx;
-      if (ctx.state === 'suspended') await ctx.resume();
-      analyserRef.current = setupAnalyser(ctx, stream);
-      setMicAccess('granted');
-      startBlowDetection();
-    } catch (e) {
-      console.warn('麦克风请求失败:', e);
-      setMicAccess('denied');
-    }
-  }, [createAudioContext, setupAnalyser, startBlowDetection]);
+      // 3. 配置 AnalyserNode
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.3;
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -10;
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      analyserRef.current = analyser;
 
-  /* ─── blow 阶段自动启动吹气检测（权限已在第一次点击时预获取） ─── */
-  useEffect(() => {
-    if (phase === 'blow' && (micAccess === 'pre-granted' || micAccess === 'pending')) {
-      requestMic();
+      // 4. 校准阶段：采样 1 秒环境噪声
+      setMicState('calibrating');
+      const CALIBRATE_MS = 1000;
+      const calibrateSamples: number[] = [];
+      const calibrateStart = Date.now();
+
+      await new Promise<void>((resolve) => {
+        const calibratePoll = setInterval(() => {
+          const buf = new Uint8Array(analyser.fftSize);
+          analyser.getByteTimeDomainData(buf);
+          let sumSq = 0;
+          for (let i = 0; i < buf.length; i++) {
+            const norm = (buf[i] - 128) / 128;
+            sumSq += norm * norm;
+          }
+          calibrateSamples.push(Math.sqrt(sumSq / buf.length));
+
+          if (Date.now() - calibrateStart >= CALIBRATE_MS) {
+            clearInterval(calibratePoll);
+            resolve();
+          }
+        }, 50);
+      });
+
+      // 5. 计算阈值 = 环境噪声平均值 × 3（至少 0.03）
+      const avgNoise = calibrateSamples.reduce((a, b) => a + b, 0) / calibrateSamples.length;
+      const threshold = Math.max(0.03, avgNoise * 3);
+      thresholdRef.current = threshold;
+      console.log(`[吹蜡烛] 校准完成: 环境噪声=${avgNoise.toFixed(4)}, 阈值=${threshold.toFixed(4)}`);
+
+      // 6. 开始吹气检测
+      setMicState('ready');
+      const BLOW_DURATION_MS = 300; // 持续吹气 300ms
+
+      pollTimerRef.current = setInterval(() => {
+        const buf = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(buf);
+        let sumSq = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const norm = (buf[i] - 128) / 128;
+          sumSq += norm * norm;
+        }
+        const rms = Math.sqrt(sumSq / buf.length);
+
+        // 更新实时音量显示 (映射到 0-1)
+        const displayLevel = Math.min(1, rms / (threshold * 2));
+        setVolumeLevel(displayLevel);
+
+        if (rms > threshold) {
+          if (blowStartRef.current === null) {
+            blowStartRef.current = Date.now();
+          } else if (Date.now() - blowStartRef.current > BLOW_DURATION_MS) {
+            // 持续吹气达标 → 熄灭一根蜡烛
+            setCandles((prev) => {
+              const remaining = prev.filter((c) => c.lit);
+              if (remaining.length > 0) {
+                return prev.map((c) =>
+                  c.id === remaining[0].id ? { ...c, lit: false } : c
+                );
+              }
+              return prev;
+            });
+            blowStartRef.current = null;
+          }
+        } else {
+          blowStartRef.current = null;
+        }
+      }, 50);
+
+    } catch (e) {
+      console.warn('[吹蜡烛] 麦克风失败:', e);
+      setMicState('denied');
     }
-  }, [phase, micAccess, requestMic]);
+  }, []);
 
   /* ─── 全部熄灭 → 祝福视频 ─── */
   useEffect(() => {
     if (phase === 'blow' && candles.every((c) => !c.lit)) {
       stopBlowDetection();
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      setVolumeLevel(0);
       setTimeout(() => {
         triggerConfetti();
         playCelebrationTone();
@@ -392,7 +342,7 @@ export default function ChildRoom12() {
     }
   }, [candles, phase, stopBlowDetection]);
 
-  /* ─── 手动熄灭（无麦克风时） ─── */
+  /* ─── 手动熄灭（fallback）─── */
   const handleManualBlow = useCallback((id: number) => {
     setCandles((prev) => prev.map((c) => (c.id === id && c.lit ? { ...c, lit: false } : c)));
   }, []);
@@ -407,12 +357,12 @@ export default function ChildRoom12() {
     };
   }, [stopBlowDetection]);
 
-  /* ─── 蛋糕蜡烛X坐标（居中于顶层） ─── */
+  /* ─── 蛋糕蜡烛X坐标 ─── */
   const candleXs = [130, 150, 170];
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
-      {/* ═══ 背景图（始终显示）═══ */}
+      {/* ═══ 背景图 ═══ */}
       <img
         src={asset("/Geburtstag.webp")}
         alt=""
@@ -432,8 +382,7 @@ export default function ChildRoom12() {
             className="absolute inset-0 z-10 flex items-center justify-center"
             style={{ cursor: 'pointer' }}
             onClick={() => {
-              preRequestMic(); // 在用户手势中提前获取麦克风权限
-              initBgMusic();   // 在用户手势中初始化并"解锁"背景音乐
+              initBgMusic();
               setPhase('video');
             }}
           >
@@ -464,7 +413,7 @@ export default function ChildRoom12() {
         )}
       </AnimatePresence>
 
-      {/* ═══ Phase 3-4: 蛋糕 + 吹蜡烛（吹灭后淡出）═══ */}
+      {/* ═══ Phase 3-4: 蛋糕 + 吹蜡烛 ═══ */}
       <AnimatePresence>
         {(phase === 'cake' || phase === 'blow') && (
           <motion.div
@@ -475,11 +424,8 @@ export default function ChildRoom12() {
             transition={{ duration: 1 }}
             className="absolute inset-0 z-30 flex flex-col items-center justify-center"
           >
-            {/* 60% 黑色遮罩 */}
-            <div
-              className="absolute inset-0"
-              style={{ background: 'rgba(0,0,0,0.6)' }}
-            />
+            {/* 遮罩 */}
+            <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
 
             {/* 内容区 */}
             <div className="relative z-10 flex flex-col items-center">
@@ -511,7 +457,6 @@ export default function ChildRoom12() {
               >
                 <svg width="280" height="260" viewBox="0 0 300 260">
                   <defs>
-                    {/* 火苗渐变 */}
                     <radialGradient id="bdFlameGlow">
                       <stop offset="0%" stopColor="#F4A261" />
                       <stop offset="100%" stopColor="#E76F51" stopOpacity="0" />
@@ -521,25 +466,20 @@ export default function ChildRoom12() {
                       <stop offset="50%" stopColor="#F4A261" />
                       <stop offset="100%" stopColor="#E9C46A" />
                     </linearGradient>
-                    {/* 蛋糕体渐变 */}
                     <linearGradient id="bdCakeBody" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#F8D0DC" />
                       <stop offset="100%" stopColor="#E8A8BC" />
                     </linearGradient>
-                    {/* 糖霜渐变 */}
                     <linearGradient id="bdFrosting" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#F4A261" />
                       <stop offset="100%" stopColor="#E9C46A" />
                     </linearGradient>
                   </defs>
 
-                  {/* 底盘 */}
                   <ellipse cx={150} cy={248} rx={110} ry={10} fill="#D6EBF5" />
                   <ellipse cx={150} cy={248} rx={100} ry={7} fill="#B8D4E8" />
 
-                  {/* 底层蛋糕 */}
                   <rect x={40} y={185} width={220} height={60} rx={10} fill="url(#bdCakeBody)" />
-                  {/* 底层糖霜 */}
                   <rect x={37} y={180} width={226} height={12} rx={6} fill="url(#bdFrosting)" />
                   <circle cx={55} cy={190} r={5} fill="url(#bdFrosting)" />
                   <circle cx={85} cy={192} r={4} fill="url(#bdFrosting)" />
@@ -547,155 +487,189 @@ export default function ChildRoom12() {
                   <circle cx={180} cy={190} r={4} fill="url(#bdFrosting)" />
                   <circle cx={215} cy={192} r={5} fill="url(#bdFrosting)" />
                   <circle cx={245} cy={191} r={4} fill="url(#bdFrosting)" />
-                  {/* 底层装饰 */}
                   <circle cx={80} cy={215} r={4} fill="#E9C46A" opacity={0.6} />
                   <circle cx={130} cy={210} r={3} fill="#E9C46A" opacity={0.5} />
                   <circle cx={170} cy={218} r={4} fill="#E9C46A" opacity={0.6} />
                   <circle cx={220} cy={212} r={3} fill="#E9C46A" opacity={0.5} />
 
-                  {/* 中层蛋糕 */}
                   <rect x={70} y={115} width={160} height={70} rx={8} fill="url(#bdCakeBody)" />
-                  {/* 中层糖霜 */}
                   <rect x={67} y={110} width={166} height={10} rx={5} fill="url(#bdFrosting)" />
                   <circle cx={85} cy={118} r={4} fill="url(#bdFrosting)" />
                   <circle cx={115} cy={120} r={3.5} fill="url(#bdFrosting)" />
                   <circle cx={185} cy={119} r={4} fill="url(#bdFrosting)" />
                   <circle cx={215} cy={118} r={3.5} fill="url(#bdFrosting)" />
-                  {/* 中层装饰 */}
                   <circle cx={100} cy={148} r={3} fill="#E9C46A" opacity={0.5} />
                   <circle cx={150} cy={145} r={4} fill="#E9C46A" opacity={0.6} />
                   <circle cx={200} cy={150} r={3} fill="#E9C46A" opacity={0.5} />
 
-                  {/* 顶层蛋糕 */}
                   <rect x={100} y={60} width={100} height={58} rx={7} fill="url(#bdCakeBody)" />
-                  {/* 顶层糖霜 */}
                   <rect x={97} y={55} width={106} height={8} rx={4} fill="url(#bdFrosting)" />
                   <circle cx={115} cy={62} r={3} fill="url(#bdFrosting)" />
                   <circle cx={150} cy={63} r={3.5} fill="url(#bdFrosting)" />
                   <circle cx={185} cy={62} r={3} fill="url(#bdFrosting)" />
-                  {/* 顶层装饰 */}
                   <circle cx={125} cy={88} r={3} fill="#E9C46A" opacity={0.5} />
                   <circle cx={175} cy={85} r={3} fill="#E9C46A" opacity={0.5} />
 
-                  {/* 蜡烛 */}
                   {candleXs.map((cx, i) => (
                     <g key={i}>
-                      {/* 蜡烛体 */}
                       <rect
                         x={cx - 4} y={38} width={8} height={20} rx={2}
                         fill={candles[i].lit ? '#F8C8DC' : '#D6EBF5'}
                         style={{ cursor: candles[i].lit ? 'pointer' : 'default' }}
                         onClick={() => handleManualBlow(i)}
                       />
-                      {/* 烛芯 */}
-                      <line
-                        x1={cx} y1={38} x2={cx} y2={33}
-                        stroke="#405B7A" strokeWidth={1.5}
-                      />
-                      {/* 火苗 */}
-                      <Flame lit={candles[i].lit} x={cx} baseY={30} />
-                      {/* 烟雾 */}
+                      <line x1={cx} y1={38} x2={cx} y2={33} stroke="#405B7A" strokeWidth={1.5} />
+                      <Flame lit={candles[i].lit} x={cx} baseY={30} wind={volumeLevel} />
                       {!candles[i].lit && <SmokeWisp x={cx} baseY={30} />}
                     </g>
                   ))}
                 </svg>
               </motion.div>
 
-              {/* 麦克风状态提示 */}
-              {phase === 'blow' && micAccess === 'pending' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col items-center gap-3"
-                  style={{ marginTop: 20 }}
-                >
-                  <button
-                    onClick={requestMic}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '10px 24px',
-                      borderRadius: 20,
-                      border: 'none',
-                      background: '#6B9AC4',
-                      color: '#fff',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      fontFamily: 'Quicksand, sans-serif',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(107,154,196,0.4)',
-                    }}
+              {/* ═══ 麦克风控制区 ═══ */}
+              <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+
+                {/* 还没开启麦克风 → 显示开始按钮 */}
+                {phase === 'blow' && micState === 'idle' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center gap-3"
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                      <line x1="8" y1="23" x2="16" y2="23" />
-                    </svg>
-                    开启麦克风吹蜡烛
-                  </button>
-                  <button
-                    onClick={() => {
-                      const remaining = candles.filter((c) => c.lit);
-                      if (remaining.length > 0) {
-                        setCandles((prev) =>
-                          prev.map((c) =>
-                            c.id === remaining[0].id ? { ...c, lit: false } : c
-                          )
-                        );
-                      }
-                    }}
+                    <button
+                      onClick={startMicAndBlow}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '12px 28px',
+                        borderRadius: 24,
+                        border: 'none',
+                        background: 'linear-gradient(135deg, #6B9AC4, #7BB3D4)',
+                        color: '#fff',
+                        fontSize: 16,
+                        fontWeight: 600,
+                        fontFamily: 'Quicksand, sans-serif',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 20px rgba(107,154,196,0.5)',
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
+                      </svg>
+                      点我开始吹蜡烛
+                    </button>
+                    <button
+                      onClick={() => {
+                        const remaining = candles.filter((c) => c.lit);
+                        if (remaining.length > 0) {
+                          setCandles((prev) =>
+                            prev.map((c) =>
+                              c.id === remaining[0].id ? { ...c, lit: false } : c
+                            )
+                          );
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontFamily: 'Quicksand, sans-serif',
+                        fontSize: 13,
+                        color: 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      或点击蜡烛手动熄灭
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* 校准中 */}
+                {phase === 'blow' && micState === 'calibrating' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    <motion.div
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      style={{
+                        fontFamily: 'Quicksand, sans-serif',
+                        fontSize: 14,
+                        color: 'rgba(255,255,255,0.7)',
+                      }}
+                    >
+                      🎤 正在校准环境...
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                {/* 就绪：显示实时音量 + 吹气提示 */}
+                {phase === 'blow' && micState === 'ready' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center gap-3"
+                  >
+                    {/* 实时音量条 */}
+                    <div style={{ width: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <div style={{
+                        width: '100%',
+                        height: 6,
+                        borderRadius: 3,
+                        background: 'rgba(255,255,255,0.15)',
+                        overflow: 'hidden',
+                      }}>
+                        <motion.div
+                          style={{
+                            height: '100%',
+                            borderRadius: 3,
+                            background: volumeLevel > 0.5
+                              ? 'linear-gradient(90deg, #E9C46A, #F4A261)'
+                              : 'linear-gradient(90deg, #6B9AC4, #B8D4E8)',
+                            width: `${volumeLevel * 100}%`,
+                            transition: 'width 0.05s linear',
+                          }}
+                        />
+                      </div>
+                      <p style={{
+                        fontFamily: 'Quicksand, sans-serif',
+                        fontSize: 13,
+                        color: 'rgba(255,255,255,0.5)',
+                        margin: 0,
+                      }}>
+                        对着手机吹气～还剩 {candles.filter((c) => c.lit).length} 支
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 麦克风被拒绝 */}
+                {phase === 'blow' && micState === 'denied' && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     style={{
-                      background: 'none',
-                      border: 'none',
                       fontFamily: 'Quicksand, sans-serif',
                       fontSize: 13,
                       color: 'rgba(255,255,255,0.5)',
-                      cursor: 'pointer',
                     }}
                   >
-                    手动熄灭蜡烛
-                  </button>
-                </motion.div>
-              )}
-              {(phase === 'blow' && (micAccess === 'granted' || micAccess === 'pre-granted')) && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  style={{
-                    marginTop: 20,
-                    fontFamily: 'Quicksand, sans-serif',
-                    fontSize: 14,
-                    color: 'rgba(255,255,255,0.6)',
-                  }}
-                >
-                  对着手机吹气，吹灭蜡烛！还剩 {candles.filter((c) => c.lit).length} 支
-                </motion.p>
-              )}
-              {phase === 'blow' && micAccess === 'denied' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col items-center gap-3"
-                  style={{ marginTop: 20 }}
-                >
-                  <p style={{
-                    fontFamily: 'Quicksand, sans-serif',
-                    fontSize: 13,
-                    color: 'rgba(255,255,255,0.5)',
-                  }}>
                     点击蜡烛手动熄灭哦～
-                  </p>
-                </motion.div>
-              )}
+                  </motion.p>
+                )}
+              </div>
 
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ═══ 浮动音乐按钮（cake/blow 阶段） ═══ */}
+      {/* ═══ 浮动音乐按钮 ═══ */}
       {(phase === 'cake' || phase === 'blow') && (
         <motion.button
           initial={{ opacity: 0, scale: 0.8 }}
@@ -807,7 +781,7 @@ export default function ChildRoom12() {
   );
 }
 
-/* ═══════════════════ 视频播放组件（确保从头播放）═══════════════════ */
+/* ═══════════════════ 视频播放组件 ══════════════════ */
 
 function BirthdayVideoPlayer({ fading, onEnded }: { fading: boolean; onEnded: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -815,7 +789,6 @@ function BirthdayVideoPlayer({ fading, onEnded }: { fading: boolean; onEnded: ()
     const v = ref.current;
     if (!v) return;
     v.currentTime = 0;
-    // 先尝试有声音播放，被浏览器阻止则静音重试
     v.play().catch(() => {
       v.muted = true;
       v.play().catch(() => {});
