@@ -101,9 +101,8 @@ export default function ChildRoom12() {
   const [candles, setCandles] = useState<CandleState[]>(
     Array.from({ length: 3 }, (_, i) => ({ id: i, lit: true }))
   );
-  const [micAccess, setMicAccess] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [micAccess, setMicAccess] = useState<'pending' | 'pre-granted' | 'granted' | 'denied'>('pending');
 
-  const videoRef = useRef<HTMLVideoElement>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -130,7 +129,7 @@ export default function ChildRoom12() {
 
   /* ─── 音乐渐弱 ─── */
   useEffect(() => {
-    if (phase === 'celebration' && bgMusicRef.current) {
+    if (phase === 'blessing' && bgMusicRef.current) {
       const audio = bgMusicRef.current;
       const fade = setInterval(() => {
         if (audio.volume > 0.05) {
@@ -150,6 +149,27 @@ export default function ChildRoom12() {
       return () => clearTimeout(timer);
     }
   }, [phase]);
+
+  /* ─── 预请求麦克风（在第一次用户点击时调用，提前获取权限） ─── */
+  const preRequestMic = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) return; // 非 HTTPS 或不支持
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      // 在用户手势中同时创建 AudioContext（iOS 要求）
+      const audioContext = new (window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
+      audioContext.createMediaStreamSource(stream).connect(analyser);
+      setMicAccess('pre-granted');
+    } catch (e) {
+      console.warn('麦克风预请求失败:', e);
+      // 保持 pending，blow 阶段会再试或显示按钮
+    }
+  }, []);
 
   /* ─── 吹蜡烛检测 ─── */
   const detectBlow = useCallback(() => {
@@ -184,6 +204,13 @@ export default function ChildRoom12() {
 
   const requestMic = useCallback(async () => {
     try {
+      // 如果预请求已经设置好了 stream + analyser，直接复用
+      if (streamRef.current && analyserRef.current && streamRef.current.active) {
+        setMicAccess('granted');
+        rafRef.current = requestAnimationFrame(detectBlow);
+        return;
+      }
+      // 否则全新请求
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const audioContext = new (window.AudioContext ||
@@ -195,15 +222,18 @@ export default function ChildRoom12() {
       audioContext.createMediaStreamSource(stream).connect(analyser);
       setMicAccess('granted');
       rafRef.current = requestAnimationFrame(detectBlow);
-    } catch {
+    } catch (e) {
+      console.warn('麦克风请求失败:', e);
       setMicAccess('denied');
     }
   }, [detectBlow]);
 
-  /* ─── blow 阶段自动请求麦克风 ─── */
+  /* ─── blow 阶段自动启动吹气检测（权限已在第一次点击时预获取） ─── */
   useEffect(() => {
-    if (phase === 'blow') requestMic();
-  }, [phase, requestMic]);
+    if (phase === 'blow' && (micAccess === 'pre-granted' || micAccess === 'pending')) {
+      requestMic();
+    }
+  }, [phase, micAccess, requestMic]);
 
   /* ─── 全部熄灭 → 祝福视频 ─── */
   useEffect(() => {
@@ -257,7 +287,10 @@ export default function ChildRoom12() {
             transition={{ duration: 0.6 }}
             className="absolute inset-0 z-10 flex items-center justify-center"
             style={{ cursor: 'pointer' }}
-            onClick={() => setPhase('video')}
+            onClick={() => {
+              preRequestMic(); // 在用户手势中提前获取麦克风权限
+              setPhase('video');
+            }}
           >
             <motion.p
               animate={{ opacity: [0.3, 0.7, 0.3] }}
@@ -306,7 +339,7 @@ export default function ChildRoom12() {
             {/* 内容区 */}
             <div className="relative z-10 flex flex-col items-center">
               {/* 提示文字 */}
-              {phase !== 'celebration' && (
+              {(phase === 'cake' || phase === 'blow') && (
                 <motion.p
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -406,8 +439,8 @@ export default function ChildRoom12() {
                       <rect
                         x={cx - 4} y={38} width={8} height={20} rx={2}
                         fill={candles[i].lit ? '#F8C8DC' : '#D6EBF5'}
-                        style={{ cursor: micAccess === 'denied' && candles[i].lit ? 'pointer' : 'default' }}
-                        onClick={() => micAccess === 'denied' && handleManualBlow(i)}
+                        style={{ cursor: micAccess !== 'granted' && candles[i].lit ? 'pointer' : 'default' }}
+                        onClick={() => micAccess !== 'granted' && handleManualBlow(i)}
                       />
                       {/* 烛芯 */}
                       <line
@@ -424,7 +457,64 @@ export default function ChildRoom12() {
               </motion.div>
 
               {/* 麦克风状态提示 */}
-              {phase === 'blow' && micAccess === 'granted' && (
+              {phase === 'blow' && micAccess === 'pending' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-3"
+                  style={{ marginTop: 20 }}
+                >
+                  <button
+                    onClick={requestMic}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 24px',
+                      borderRadius: 20,
+                      border: 'none',
+                      background: '#6B9AC4',
+                      color: '#fff',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      fontFamily: 'Quicksand, sans-serif',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(107,154,196,0.4)',
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                      <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                    开启麦克风吹蜡烛
+                  </button>
+                  <button
+                    onClick={() => {
+                      const remaining = candles.filter((c) => c.lit);
+                      if (remaining.length > 0) {
+                        setCandles((prev) =>
+                          prev.map((c) =>
+                            c.id === remaining[0].id ? { ...c, lit: false } : c
+                          )
+                        );
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontFamily: 'Quicksand, sans-serif',
+                      fontSize: 13,
+                      color: 'rgba(255,255,255,0.5)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    手动熄灭蜡烛
+                  </button>
+                </motion.div>
+              )}
+              {(phase === 'blow' && (micAccess === 'granted' || micAccess === 'pre-granted')) && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -439,43 +529,22 @@ export default function ChildRoom12() {
                 </motion.p>
               )}
               {phase === 'blow' && micAccess === 'denied' && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  style={{
-                    marginTop: 20,
-                    fontFamily: 'Quicksand, sans-serif',
-                    fontSize: 14,
-                    color: 'rgba(255,255,255,0.6)',
-                  }}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-3"
+                  style={{ marginTop: 20 }}
                 >
-                  点击蜡烛手动熄灭
-                </motion.p>
+                  <p style={{
+                    fontFamily: 'Quicksand, sans-serif',
+                    fontSize: 13,
+                    color: 'rgba(255,255,255,0.5)',
+                  }}>
+                    无法访问麦克风，点击蜡烛手动熄灭哦~
+                  </p>
+                </motion.div>
               )}
 
-              {/* ═══ 庆祝 ═══ */}
-              <AnimatePresence>
-                {phase === 'blessing' && (
-                  <motion.div
-                    key="celebrate"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: [0.5, 1.15, 1] }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                    className="flex flex-col items-center"
-                  >
-                    <p style={{
-                      fontFamily: 'Quicksand, sans-serif',
-                      fontSize: 28,
-                      fontWeight: 700,
-                      color: '#E9C46A',
-                      marginBottom: 8,
-                      textShadow: '0 2px 12px rgba(233,196,106,0.4)',
-                    }}>
-                      🎉
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           </motion.div>
         )}

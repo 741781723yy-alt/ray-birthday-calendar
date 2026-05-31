@@ -7,7 +7,8 @@ export type ContentType =
   | 'voice'
   | 'video'
   | 'candle'
-  | 'timeline';
+  | 'timeline'
+  | 'envelope';
 
 // Voice Message Item
 export interface VoiceMessageData {

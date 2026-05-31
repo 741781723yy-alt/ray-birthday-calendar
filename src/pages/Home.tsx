@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 import Layout from '../components/Layout';
 import DayPopup from '../components/DayPopup';
 import { triggerConfetti } from '../lib/confetti';

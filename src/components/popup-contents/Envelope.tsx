@@ -11,11 +11,11 @@ const envelopeVariants = {
   initial: { scale: 1, opacity: 1 },
   click: {
     scale: 1.05,
-    transition: { duration: 0.3, ease: 'easeOut' }
+    transition: { duration: 0.3, ease: 'easeOut' as const }
   },
   fadeOut: {
     opacity: 0,
-    transition: { duration: 0.5, ease: 'easeOut' }
+    transition: { duration: 0.5, ease: 'easeOut' as const }
   },
   hidden: { opacity: 0, scale: 0.9 },
 };
@@ -26,7 +26,7 @@ const letterVariants = {
   visible: {
     y: 0,
     opacity: 1,
-    transition: { duration: 0.8, ease: 'easeOut' }
+    transition: { duration: 0.8, ease: 'easeOut' as const }
   },
 };
 
@@ -91,7 +91,7 @@ export default function Envelope({ content }: EnvelopeProps) {
               alt="打开的信封"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
+              transition={{ duration: 0.6, ease: 'easeOut' as const }}
               style={{
                 width: '100%',
                 height: '100%',
