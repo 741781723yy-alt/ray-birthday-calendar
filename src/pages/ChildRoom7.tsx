@@ -263,7 +263,7 @@ export default function ChildRoom7() {
               }}
             >
               <img
-                src={`/photos/day7/photo-${selectedPhoto}.webp`}
+                src={asset(`/photos/day7/photo-${selectedPhoto}.webp`)}
                 alt={`Photo ${selectedPhoto}`}
                 style={{
                   width: '100%', aspectRatio: '4/5',

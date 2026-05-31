@@ -1,3 +1,5 @@
+import { asset } from '@/lib/assets';
+
 interface GallerySceneProps {
   onPhotoClick: (id: number) => void;
   viewBoxW: number;
@@ -305,7 +307,7 @@ export default function GalleryScene({ onPhotoClick, viewBoxW, cameraOffset }: G
               {renderFrame(s, (
                 <>
                   <image
-                    href={`/photos/day7/thumb/photo-${s.photoId ?? s.id}.webp`}
+                    href={asset(`/photos/day7/thumb/photo-${s.photoId ?? s.id}.webp`)}
                     x={cx}
                     y={cy}
                     width={cw}

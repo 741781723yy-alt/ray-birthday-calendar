@@ -486,7 +486,7 @@ export default function ChildRoom6() {
                   <FlipBook
                     cover={asset("/scrapbook-cover.svg")}
                     spreads={Array.from({ length: 5 }, (_, i) =>
-                      `/photos/day6/spread-${i + 1}.webp`
+                      asset(`/photos/day6/spread-${i + 1}.webp`)
                     )}
                     onComplete={handleSketchbookComplete}
                   />
