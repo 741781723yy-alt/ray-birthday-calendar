@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState, useCallback } from 'react'
 import { Routes, Route } from 'react-router'
+import PreloadScreen from './components/PreloadScreen'
 
 // 首页直接加载，其余页面懒加载
 const Home = lazy(() => import('./pages/Home'))
@@ -33,23 +34,34 @@ function Loading() {
 }
 
 export default function App() {
+  const [preloaded, setPreloaded] = useState(false);
+
+  const handlePreloadComplete = useCallback(() => {
+    setPreloaded(true);
+  }, []);
+
   return (
-    <Suspense fallback={<Loading />}>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/child-room" element={<ChildRoom />} />
-        <Route path="/child-room-2" element={<ClassRoom2Page />} />
-        <Route path="/child-room-3" element={<ChildRoom3 />} />
-        <Route path="/child-room-4" element={<ChildRoom4 />} />
-        <Route path="/child-room-5" element={<ChildRoom5 />} />
-        <Route path="/child-room-6" element={<ChildRoom6 />} />
-        <Route path="/child-room-7" element={<ChildRoom7 />} />
-        <Route path="/child-room-8" element={<ChildRoom8 />} />
-        <Route path="/child-room-9" element={<ChildRoom9 />} />
-        <Route path="/child-room-10" element={<ChildRoom10 />} />
-        <Route path="/child-room-12" element={<ChildRoom12 />} />
-        <Route path="/ending" element={<Ending />} />
-      </Routes>
-    </Suspense>
+    <>
+      {!preloaded && <PreloadScreen onComplete={handlePreloadComplete} />}
+      {preloaded && (
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/child-room" element={<ChildRoom />} />
+            <Route path="/child-room-2" element={<ClassRoom2Page />} />
+            <Route path="/child-room-3" element={<ChildRoom3 />} />
+            <Route path="/child-room-4" element={<ChildRoom4 />} />
+            <Route path="/child-room-5" element={<ChildRoom5 />} />
+            <Route path="/child-room-6" element={<ChildRoom6 />} />
+            <Route path="/child-room-7" element={<ChildRoom7 />} />
+            <Route path="/child-room-8" element={<ChildRoom8 />} />
+            <Route path="/child-room-9" element={<ChildRoom9 />} />
+            <Route path="/child-room-10" element={<ChildRoom10 />} />
+            <Route path="/child-room-12" element={<ChildRoom12 />} />
+            <Route path="/ending" element={<Ending />} />
+          </Routes>
+        </Suspense>
+      )}
+    </>
   )
 }
