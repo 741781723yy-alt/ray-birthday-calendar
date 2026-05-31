@@ -1,4 +1,3 @@
-import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { useState, useEffect, useCallback, useMemo, Component } from 'react';
 import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -113,7 +112,6 @@ function getLocalId(): string {
 
 export default function ChildRoom10() {
   return (
-  useEffect(() => { preloadDayAssets(10); preloadNextDay(11); }, []);
     <ErrorBoundary>
       <StarryWishPage />
     </ErrorBoundary>

@@ -1,7 +1,6 @@
 /**
  * 图片预加载工具
- * - 首页启动时预加载所有背景图
- * - 进入每天时预加载该天全部资源
+ * 点击日历弹窗时预加载该天全部资源，进入页面时秒开
  */
 import { asset } from './assets';
 
@@ -60,20 +59,6 @@ const DAY_ASSETS: Record<number, string[]> = {
   ],
 };
 
-/* 首页资源 */
-const HOME_ASSETS = [
-  '/building-closed.webp',
-  '/building-left-half.webp',
-  '/building-right-half.webp',
-  '/cat-sitting.webp',
-  '/balloon-cluster.webp',
-  '/gift-box.webp',
-  '/birthday-cake.webp',
-  '/character-walk.webp',
-  '/assets/envelope-closed.webp',
-  '/assets/envelope-open.webp',
-];
-
 const preloaded = new Set<string>();
 
 function preloadImage(url: string): void {
@@ -85,32 +70,10 @@ function preloadImage(url: string): void {
 
 /**
  * 预加载某一天的全部资源
- * 在进入该天页面时调用
+ * 在点击日历弹窗时调用
  */
 export function preloadDayAssets(day: number): void {
   const assets = DAY_ASSETS[day];
   if (!assets) return;
   assets.forEach((path) => preloadImage(asset(path)));
-}
-
-/**
- * 预加载下一天的资源（延迟，不抢当天加载）
- */
-export function preloadNextDay(day: number): void {
-  setTimeout(() => preloadDayAssets(day), 3000);
-}
-
-/**
- * 首页启动时调用：加载所有背景 + 首页装饰
- */
-export function preloadAllImages(): void {
-  // 立即加载每天背景（第 1 张）
-  Object.values(DAY_ASSETS).forEach((assets) => {
-    if (assets.length > 0) preloadImage(asset(assets[0]));
-  });
-
-  // 延迟加载首页装饰
-  setTimeout(() => {
-    HOME_ASSETS.forEach((path) => preloadImage(asset(path)));
-  }, 2000);
 }

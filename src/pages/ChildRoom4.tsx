@@ -1,4 +1,3 @@
-import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -129,7 +128,6 @@ function GlassCard({ lines, visible, fadeDelay = 0 }: { lines: string[]; visible
 
 export default function ChildRoom4() {
   const navigate = useNavigate();
-  useEffect(() => { preloadDayAssets(4); preloadNextDay(5); }, []);
   const [phase, setPhase] = useState<Phase>('travel');
   const [travelProgress, setTravelProgress] = useState(0);
 

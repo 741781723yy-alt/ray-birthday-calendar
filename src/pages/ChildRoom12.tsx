@@ -1,4 +1,3 @@
-import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { asset } from "@/lib/assets";
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -98,7 +97,6 @@ function playCelebrationTone() {
 
 export default function ChildRoom12() {
   const navigate = useNavigate();
-  useEffect(() => { preloadDayAssets(12); }, []);
   const [phase, setPhase] = useState<Phase>('background');
   const [videoFading, setVideoFading] = useState(false);
   const [candles, setCandles] = useState<CandleState[]>(

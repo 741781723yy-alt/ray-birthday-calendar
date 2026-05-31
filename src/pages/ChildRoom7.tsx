@@ -1,4 +1,3 @@
-import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,7 +54,6 @@ function EndingText({ lines, visible }: { lines: string[]; visible: boolean }) {
 
 export default function ChildRoom7() {
   const navigate = useNavigate();
-  useEffect(() => { preloadDayAssets(7); preloadNextDay(8); }, []);
   const [phase, setPhase] = useState<Phase>('flash');
 
   // Photo detail

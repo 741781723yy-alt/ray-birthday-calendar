@@ -1,5 +1,4 @@
 import { asset } from "@/lib/assets";
-import { preloadDayAssets, preloadNextDay } from "@/lib/preload";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -173,9 +172,6 @@ function FadeParagraph({
 
 export default function ChildRoom() {
   const navigate = useNavigate();
-
-  // 预加载当天 + 下一天资源
-  useEffect(() => { preloadDayAssets(1); preloadNextDay(2); }, []);
   const [phase, setPhase] = useState<Phase>('travel');
   const [travelProgress, setTravelProgress] = useState(0);
 

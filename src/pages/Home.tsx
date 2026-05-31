@@ -1,4 +1,5 @@
 import { asset } from "@/lib/assets";
+import { preloadDayAssets } from "@/lib/preload";
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router';
@@ -237,6 +238,7 @@ export default function Home() {
 
   const handleWindowTap = useCallback((day: number) => {
     setSelectedDay(day);
+    preloadDayAssets(day); // 打开弹窗时就开始预加载该天资源
   }, []);
 
   const handleClosePopup = useCallback(() => {

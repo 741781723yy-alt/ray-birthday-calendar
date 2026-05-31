@@ -1,4 +1,3 @@
-import { preloadDayAssets, preloadNextDay } from '@/lib/preload';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -47,7 +46,6 @@ const LINE_GAP = 2.0;
 
 export default function ChildRoom8() {
   const navigate = useNavigate();
-  useEffect(() => { preloadDayAssets(8); preloadNextDay(9); }, []);
   const [phase, setPhase] = useState<Phase>('drawer');
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [read, setRead] = useState<Set<number>>(new Set());
