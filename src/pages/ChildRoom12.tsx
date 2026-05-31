@@ -109,8 +109,9 @@ export default function ChildRoom12() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const blowStartRef = useRef<number | null>(null);
+  const silentCountRef = useRef(0);
 
   /* ─── 视频播放结束 ─── */
   const handleVideoEnded = useCallback(() => {
@@ -207,83 +208,169 @@ export default function ChildRoom12() {
     }
   }, [phase]);
 
+  /* ─── 辅助：创建 AudioContext（兼容 Safari） ─── */
+  const createAudioContext = useCallback(() => {
+    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    return new Ctor();
+  }, []);
+
+  /* ─── 辅助：配置 AnalyserNode ─── */
+  const setupAnalyser = useCallback((ctx: AudioContext, stream: MediaStream) => {
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.3;
+    analyser.minDecibels = -90;
+    analyser.maxDecibels = -10;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    return analyser;
+  }, []);
+
   /* ─── 预请求麦克风（在第一次用户点击时调用，提前获取权限） ─── */
   const preRequestMic = useCallback(async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) return; // 非 HTTPS 或不支持
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      // 在用户手势中同时创建 AudioContext（iOS 要求）
-      const audioContext = new (window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      // 在用户手势中创建 AudioContext + 立即 resume（iOS Safari 必须）
+      const audioContext = createAudioContext();
       audioContextRef.current = audioContext;
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
+      // iOS Safari 始终以 suspended 状态创建，必须 resume
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+      const analyser = setupAnalyser(audioContext, stream);
       analyserRef.current = analyser;
-      audioContext.createMediaStreamSource(stream).connect(analyser);
       setMicAccess('pre-granted');
     } catch (e) {
       console.warn('麦克风预请求失败:', e);
-      // 保持 pending，blow 阶段会再试或显示按钮
     }
-  }, []);
+  }, [createAudioContext, setupAnalyser]);
 
-  /* ─── 吹蜡烛检测 ─── */
-  const detectBlow = useCallback(() => {
-    if (!analyserRef.current) return;
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
+  /* ─── 吹蜡烛检测（RMS 时域，比频率域更可靠） ─── */
+  const startBlowDetection = useCallback(() => {
+    if (pollTimerRef.current) return; // 已在运行
 
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-    const average = sum / dataArray.length;
+    const BLOW_RMS_THRESHOLD = 0.12;  // RMS 阈值（0~1 范围）
+    const BLOW_DURATION_MS = 400;      // 需要持续吹气的时长
 
-    if (average > 30) {
-      if (blowStartRef.current === null) {
-        blowStartRef.current = Date.now();
-      } else if (Date.now() - blowStartRef.current > 400) {
-        setCandles((prev) => {
-          const remaining = prev.filter((c) => c.lit);
-          if (remaining.length > 0) {
-            return prev.map((c) =>
-              c.id === remaining[0].id ? { ...c, lit: false } : c
-            );
-          }
-          return prev;
-        });
+    pollTimerRef.current = setInterval(() => {
+      const analyser = analyserRef.current;
+      if (!analyser) return;
+
+      // 读取时域数据
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteTimeDomainData(dataArray);
+
+      // 计算 RMS（均方根）
+      let sumSquares = 0;
+      let allSilent = true;
+      for (let i = 0; i < bufferLength; i++) {
+        const normalized = (dataArray[i] - 128) / 128; // 归一化到 -1~1
+        sumSquares += normalized * normalized;
+        if (dataArray[i] !== 128) allSilent = false;
+      }
+      const rms = Math.sqrt(sumSquares / bufferLength);
+
+      // iOS Safari 已知 bug：流突然返回全静音（全是 128）
+      // 连续 20 次 → 重建管道
+      if (allSilent) {
+        silentCountRef.current++;
+        if (silentCountRef.current > 20) {
+          silentCountRef.current = 0;
+          console.warn('检测到静音流，尝试重建音频管道...');
+          rebuildPipeline();
+          return;
+        }
+      } else {
+        silentCountRef.current = 0;
+      }
+
+      if (rms > BLOW_RMS_THRESHOLD) {
+        if (blowStartRef.current === null) {
+          blowStartRef.current = Date.now();
+        } else if (Date.now() - blowStartRef.current > BLOW_DURATION_MS) {
+          // 持续吹气达标 → 熄灭一根
+          setCandles((prev) => {
+            const remaining = prev.filter((c) => c.lit);
+            if (remaining.length > 0) {
+              return prev.map((c) =>
+                c.id === remaining[0].id ? { ...c, lit: false } : c
+              );
+            }
+            return prev;
+          });
+          blowStartRef.current = null;
+        }
+      } else {
         blowStartRef.current = null;
       }
-    } else {
-      blowStartRef.current = null;
-    }
-    rafRef.current = requestAnimationFrame(detectBlow);
+    }, 50); // 50ms 轮询，比 rAF 在移动端更稳定
   }, []);
+
+  /* ─── 停止吹气检测 ─── */
+  const stopBlowDetection = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  /* ─── 重建音频管道（iOS Safari 流恢复） ─── */
+  const rebuildPipeline = useCallback(async () => {
+    stopBlowDetection();
+    try {
+      // 关闭旧的
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
+
+      // 重建
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const ctx = createAudioContext();
+      audioContextRef.current = ctx;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      analyserRef.current = setupAnalyser(ctx, stream);
+      startBlowDetection();
+    } catch (e) {
+      console.warn('重建音频管道失败:', e);
+      setMicAccess('denied');
+    }
+  }, [createAudioContext, setupAnalyser, startBlowDetection, stopBlowDetection]);
 
   const requestMic = useCallback(async () => {
     try {
-      // 如果预请求已经设置好了 stream + analyser，直接复用
-      if (streamRef.current && analyserRef.current && streamRef.current.active) {
-        setMicAccess('granted');
-        rafRef.current = requestAnimationFrame(detectBlow);
-        return;
+      // 如果预请求已经成功，直接复用
+      if (streamRef.current && analyserRef.current) {
+        // 检查 stream 是否还活着
+        const trackAlive = streamRef.current.getTracks().some((t) => t.readyState === 'live');
+        if (trackAlive) {
+          // 确保 AudioContext 不是 suspended
+          const ctx = audioContextRef.current;
+          if (ctx && ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+          setMicAccess('granted');
+          startBlowDetection();
+          return;
+        }
+        // stream 已死，需要重建
       }
-      // 否则全新请求
+
+      // 全新请求
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const audioContext = new (window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      audioContextRef.current = audioContext;
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      analyserRef.current = analyser;
-      audioContext.createMediaStreamSource(stream).connect(analyser);
+      const ctx = createAudioContext();
+      audioContextRef.current = ctx;
+      if (ctx.state === 'suspended') await ctx.resume();
+      analyserRef.current = setupAnalyser(ctx, stream);
       setMicAccess('granted');
-      rafRef.current = requestAnimationFrame(detectBlow);
+      startBlowDetection();
     } catch (e) {
       console.warn('麦克风请求失败:', e);
       setMicAccess('denied');
     }
-  }, [detectBlow]);
+  }, [createAudioContext, setupAnalyser, startBlowDetection]);
 
   /* ─── blow 阶段自动启动吹气检测（权限已在第一次点击时预获取） ─── */
   useEffect(() => {
@@ -295,7 +382,7 @@ export default function ChildRoom12() {
   /* ─── 全部熄灭 → 祝福视频 ─── */
   useEffect(() => {
     if (phase === 'blow' && candles.every((c) => !c.lit)) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      stopBlowDetection();
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
       setTimeout(() => {
         triggerConfetti();
@@ -303,7 +390,7 @@ export default function ChildRoom12() {
         setPhase('blessing');
       }, 800);
     }
-  }, [candles, phase]);
+  }, [candles, phase, stopBlowDetection]);
 
   /* ─── 手动熄灭（无麦克风时） ─── */
   const handleManualBlow = useCallback((id: number) => {
@@ -313,12 +400,12 @@ export default function ChildRoom12() {
   /* ─── 清理 ─── */
   useEffect(() => {
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      stopBlowDetection();
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
       if (audioContextRef.current) audioContextRef.current.close();
       bgMusicRef.current?.pause();
     };
-  }, []);
+  }, [stopBlowDetection]);
 
   /* ─── 蛋糕蜡烛X坐标（居中于顶层） ─── */
   const candleXs = [130, 150, 170];
@@ -497,8 +584,8 @@ export default function ChildRoom12() {
                       <rect
                         x={cx - 4} y={38} width={8} height={20} rx={2}
                         fill={candles[i].lit ? '#F8C8DC' : '#D6EBF5'}
-                        style={{ cursor: micAccess !== 'granted' && candles[i].lit ? 'pointer' : 'default' }}
-                        onClick={() => micAccess !== 'granted' && handleManualBlow(i)}
+                        style={{ cursor: candles[i].lit ? 'pointer' : 'default' }}
+                        onClick={() => handleManualBlow(i)}
                       />
                       {/* 烛芯 */}
                       <line
@@ -598,7 +685,7 @@ export default function ChildRoom12() {
                     fontSize: 13,
                     color: 'rgba(255,255,255,0.5)',
                   }}>
-                    无法访问麦克风，点击蜡烛手动熄灭哦~
+                    点击蜡烛手动熄灭哦～
                   </p>
                 </motion.div>
               )}

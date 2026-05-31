@@ -397,11 +397,12 @@ export default function ChildRoom() {
             {/* ═══ DIALOG CONTENT ═══ */}
             <AnimatePresence>
               {phase === 'dialog' && (
-                <div className="absolute inset-0 z-30 flex flex-col items-center justify-start px-6 py-10 gap-6" style={{ paddingTop: '35%' }}>
-                  {/* Intro typewriter (outside card) */}
+                <div className="absolute inset-0 z-30">
+                  {/* Intro typewriter - 独立居中 */}
                   <AnimatePresence>
                     {showIntro && introIndex < 2 && (
                       <motion.div
+                        className="absolute inset-0 flex items-center justify-center px-6"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -419,9 +420,12 @@ export default function ChildRoom() {
                     )}
                   </AnimatePresence>
 
-                  {/* Glassmorphism card - ALWAYS visible once Part 1 starts, NEVER fades */}
+                  {/* Glassmorphism card - 独立居中，不占 intro 的布局空间 */}
                   <div
-                    className="relative w-full max-w-[360px] rounded-3xl px-7 py-8 text-center overflow-hidden"
+                    className="absolute inset-0 flex items-center justify-center px-6 pointer-events-none"
+                  >
+                  <div
+                    className="relative w-full max-w-[360px] rounded-3xl px-7 py-8 text-center overflow-hidden pointer-events-auto"
                     style={{
                       background: 'rgba(255, 253, 248, 0.45)',
                       backdropFilter: 'blur(10px)',
@@ -466,15 +470,21 @@ export default function ChildRoom() {
                       />
                     </div>
                   </div>
+                  </div>
 
-                  {/* Night-light button - OUTSIDE card, separate space */}
-                  <div style={{ minHeight: 52 }}>
-                    <AnimatePresence>
-                      {showRewardButton && (
+                  {/* Night-light button - 独立居中，偏下方 */}
+                  <AnimatePresence>
+                    {showRewardButton && (
+                      <motion.div
+                        className="absolute left-0 right-0 flex justify-center px-6 pointer-events-auto"
+                        style={{ bottom: '22%' }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 1 }}
+                      >
                         <motion.button
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 1 }}
+                          initial={{ y: 10 }}
+                          animate={{ y: 0 }}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="relative px-7 py-3.5 rounded-full font-body text-[15px] font-bold overflow-hidden"
@@ -501,9 +511,9 @@ export default function ChildRoom() {
                           />
                           <span className="relative z-10">来领取你的儿童节奖励 ✨</span>
                         </motion.button>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </AnimatePresence>
