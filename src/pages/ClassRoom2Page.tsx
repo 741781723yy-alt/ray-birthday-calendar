@@ -43,8 +43,8 @@ interface Song {
 }
 
 const SONGS: Song[] = [
-  { id: 1, title: '下一站天后', artist: '杨玥', duration: '1:15', cover: '/album-cover-1.webp', src: '/song-1.m4a' },
-  { id: 2, title: '月牙湾', artist: '杨玥', duration: '1:23', cover: '/album-cover-2.webp', src: '/song-2.m4a' },
+  { id: 1, title: '下一站天后', artist: '杨玥', duration: '1:15', cover: asset('/album-cover-1.webp'), src: asset('/song-1.m4a') },
+  { id: 2, title: '月牙湾', artist: '杨玥', duration: '1:23', cover: asset('/album-cover-2.webp'), src: asset('/song-2.m4a') },
 ];
 
 /* ── 对话文案 ── */
