@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -199,7 +200,7 @@ export default function ChildRoom7() {
 
             {/* Girls overlay */}
             <img
-              src="/girls-illustration.png"
+              src={asset("/girls-illustration.png")}
               alt="girls"
               draggable={false}
               style={{

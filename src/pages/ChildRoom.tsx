@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -336,7 +337,7 @@ export default function ChildRoom() {
             {/* Room Background */}
             <div className="absolute inset-0">
               <img
-                src="/child-room-night.png"
+                src={asset("/child-room-night.png")}
                 alt="儿童房"
                 className="w-full h-full object-cover"
                 style={{
@@ -368,7 +369,7 @@ export default function ChildRoom() {
               animate={{ y: [0, -3, 0], scale: [1, 1.02, 1] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <img src="/cat-orange-sleeping.png" alt="橘猫" className="w-full object-contain" draggable={false} />
+              <img src={asset("/cat-orange-sleeping.png")} alt="橘猫" className="w-full object-contain" draggable={false} />
             </motion.div>
 
             {/* Grey-White Cat */}
@@ -378,7 +379,7 @@ export default function ChildRoom() {
               animate={{ y: [0, -2, 0], rotate: [-2, 2, -2] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <img src="/cat-greywhite-playing.png" alt="灰白小猫" className="w-full object-contain" draggable={false} />
+              <img src={asset("/cat-greywhite-playing.png")} alt="灰白小猫" className="w-full object-contain" draggable={false} />
             </motion.div>
 
             {/* White overlay */}
@@ -526,7 +527,7 @@ export default function ChildRoom() {
                         style={{ width: 220, height: 220 }}
                       >
                         <img
-                          src="/medal-brave.png"
+                          src={asset("/medal-brave.png")}
                           alt="六一限定·勇敢小朋友"
                           className="w-full h-full object-contain"
                           draggable={false}

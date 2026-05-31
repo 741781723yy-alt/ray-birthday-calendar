@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -287,7 +288,7 @@ export default function ChildRoom4() {
             {/* Street Background */}
             <div className="absolute inset-0">
               <img
-                src="/shanghai-street.jpg"
+                src={asset("/shanghai-street.jpg")}
                 alt="上海街道"
                 className="w-full h-full object-cover"
                 style={{
@@ -383,7 +384,7 @@ export default function ChildRoom4() {
                       }}
                     >
                       <motion.img
-                        src="/person1.png"
+                        src={asset("/person1.png")}
                         alt="person1"
                         className="h-full w-auto"
                         style={{ objectFit: 'contain' }}
@@ -404,7 +405,7 @@ export default function ChildRoom4() {
                       }}
                     >
                       <motion.img
-                        src="/person2.png"
+                        src={asset("/person2.png")}
                         alt="person2"
                         className="h-full w-auto"
                         style={{ objectFit: 'contain' }}

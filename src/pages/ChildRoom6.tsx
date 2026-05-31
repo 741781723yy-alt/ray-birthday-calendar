@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -382,7 +383,7 @@ export default function ChildRoom6() {
             {/* Office Background */}
             <div className="absolute inset-0">
               <img
-                src="/office-scene.jpg"
+                src={asset("/office-scene.jpg")}
                 alt="办公室"
                 className="w-full h-full object-cover"
                 style={{
@@ -483,7 +484,7 @@ export default function ChildRoom6() {
                   {/* Dim background */}
                   <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} />
                   <FlipBook
-                    cover="/scrapbook-cover.svg"
+                    cover={asset("/scrapbook-cover.svg")}
                     spreads={Array.from({ length: 5 }, (_, i) =>
                       `/photos/day6/spread-${i + 1}.jpg`
                     )}

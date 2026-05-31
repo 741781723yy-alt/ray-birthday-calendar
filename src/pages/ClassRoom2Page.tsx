@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -223,7 +224,7 @@ function IpodPlayer({ songs }: { songs: Song[] }) {
       {/* iPod image */}
       <div className="relative" style={{ width: 380, height: 560 }}>
         <img
-          src="/ipod-handdrawn.png"
+          src={asset("/ipod-handdrawn.png")}
           alt="iPod"
           className="w-full h-full object-contain"
           draggable={false}
@@ -495,7 +496,7 @@ export default function ClassRoom2Page() {
             {/* Classroom Background */}
             <div className="absolute inset-0">
               <img
-                src="/classroom-day.jpg"
+                src={asset("/classroom-day.jpg")}
                 alt="教室"
                 className="w-full h-full object-cover"
                 style={{

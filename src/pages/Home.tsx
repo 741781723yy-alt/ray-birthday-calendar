@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router';
@@ -359,7 +360,7 @@ export default function Home() {
                 onClick={handleBuildingTap}
               >
                 <img
-                  src="/building-closed.png"
+                  src={asset("/building-closed.png")}
                   alt="Closed building"
                   className="w-full h-full object-contain"
                   draggable={false}
@@ -391,7 +392,7 @@ export default function Home() {
                     }}
                   >
                     <img
-                      src="/building-left-half.png"
+                      src={asset("/building-left-half.png")}
                       alt="Building left half"
                       className="w-full h-full object-contain object-right"
                       draggable={false}
@@ -409,7 +410,7 @@ export default function Home() {
                     }}
                   >
                     <img
-                      src="/building-right-half.png"
+                      src={asset("/building-right-half.png")}
                       alt="Building right half"
                       className="w-full h-full object-contain object-left"
                       draggable={false}
@@ -463,7 +464,7 @@ export default function Home() {
             animate={{ y: [0, -4, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <img src="/cat-sitting.png" alt="Cat" className="w-14 h-14 object-contain" draggable={false} />
+            <img src={asset("/cat-sitting.png")} alt="Cat" className="w-14 h-14 object-contain" draggable={false} />
           </motion.div>
 
           {/* ── Decorative: Balloons ── */}
@@ -473,7 +474,7 @@ export default function Home() {
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <img src="/balloon-cluster.png" alt="Balloons" className="w-16 h-20 object-contain" draggable={false} />
+              <img src={asset("/balloon-cluster.png")} alt="Balloons" className="w-16 h-20 object-contain" draggable={false} />
             </motion.div>
           )}
 
@@ -484,7 +485,7 @@ export default function Home() {
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
             >
-              <img src="/gift-box.png" alt="Gift" className="w-12 h-12 object-contain" draggable={false} />
+              <img src={asset("/gift-box.png")} alt="Gift" className="w-12 h-12 object-contain" draggable={false} />
             </motion.div>
           )}
 
@@ -495,7 +496,7 @@ export default function Home() {
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
             >
-              <img src="/birthday-cake.png" alt="Cake" className="w-12 h-12 object-contain" draggable={false} />
+              <img src={asset("/birthday-cake.png")} alt="Cake" className="w-12 h-12 object-contain" draggable={false} />
             </motion.div>
           )}
         </div>
@@ -506,7 +507,7 @@ export default function Home() {
         <div className="absolute bottom-1 animate-character-walk" style={{ willChange: 'transform' }}>
           <div className="animate-bob">
             <img
-              src="/character-walk.png"
+              src={asset("/character-walk.png")}
               alt="Walking character"
               className="w-[50px] h-[70px] object-contain"
               draggable={false}
@@ -697,7 +698,7 @@ function Day11Envelope({ onClose }: { onClose: () => void }) {
 
         {/* 图1 关闭信封 */}
         <motion.img
-          src="/assets/envelope-closed.png"
+          src={asset("/assets/envelope-closed.png")}
           alt="关闭的信封"
           initial={{ opacity: 1 }}
           animate={{ opacity: stage === 'closed' ? 1 : 0 }}
@@ -715,7 +716,7 @@ function Day11Envelope({ onClose }: { onClose: () => void }) {
 
         {/* 图2 打开信封 */}
         <motion.img
-          src="/assets/envelope-open.png"
+          src={asset("/assets/envelope-open.png")}
           alt="打开的信封"
           initial={{ opacity: 0 }}
           animate={{ opacity: stage === 'open' ? 1 : 0 }}

@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -270,7 +271,7 @@ export default function ChildRoom12() {
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
       {/* ═══ 背景图（始终显示）═══ */}
       <img
-        src="/Geburtstag.jpeg"
+        src={asset("/Geburtstag.jpeg")}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         style={{ zIndex: 0 }}
@@ -649,10 +650,10 @@ function BirthdayVideoPlayer({ fading, onEnded }: { fading: boolean; onEnded: ()
       animate={{ opacity: fading ? 0 : 1 }}
       transition={{ duration: fading ? 1.2 : 0.8 }}
     >
-      <img src="/Geburtstag.jpeg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <img src={asset("/Geburtstag.jpeg")} alt="" className="absolute inset-0 w-full h-full object-cover" />
       <video
         ref={ref}
-        src="/birthday-video.mp4"
+        src={asset("/birthday-video.mp4")}
         playsInline
         onEnded={onEnded}
         style={{ maxWidth: '120%', maxHeight: '120%', objectFit: 'contain', position: 'relative', zIndex: 1 }}
@@ -680,10 +681,10 @@ function BlessingVideoPlayer({ onEnded }: { onEnded: () => void }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 1 }}
     >
-      <img src="/Geburtstag.jpeg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <img src={asset("/Geburtstag.jpeg")} alt="" className="absolute inset-0 w-full h-full object-cover" />
       <video
         ref={ref}
-        src="/blessing-video.mp4"
+        src={asset("/blessing-video.mp4")}
         playsInline
         onEnded={onEnded}
         style={{ maxWidth: '120%', maxHeight: '120%', objectFit: 'contain', position: 'relative', zIndex: 1 }}

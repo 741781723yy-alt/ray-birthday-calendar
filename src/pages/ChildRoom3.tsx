@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -368,7 +369,7 @@ export default function ChildRoom3() {
             {/* Campus Background */}
             <div className="absolute inset-0">
               <img
-                src="/university-campus.jpg"
+                src={asset("/university-campus.jpg")}
                 alt="大学校园"
                 className="w-full h-full object-cover"
                 style={{

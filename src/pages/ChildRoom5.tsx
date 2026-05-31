@@ -1,3 +1,4 @@
+import { asset } from "@/lib/assets";
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -356,7 +357,7 @@ export default function ChildRoom5() {
             {/* Leeds Background */}
             <div className="absolute inset-0">
               <img
-                src="/leeds-scene.jpg"
+                src={asset("/leeds-scene.jpg")}
                 alt="英国利兹"
                 className="w-full h-full object-cover"
                 style={{
