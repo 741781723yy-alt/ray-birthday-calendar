@@ -5,3 +5,10 @@ public/originals_backup/
 # 视频原始备份，不提交到Git
 public/birthday-video-original.mp4
 public/blessing-video-original.mp4
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
