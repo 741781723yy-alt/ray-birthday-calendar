@@ -8,21 +8,33 @@ interface PreloadScreenProps {
 
 export default function PreloadScreen({ onComplete }: PreloadScreenProps) {
   const [progress, setProgress] = useState(0);
+  const [phase, setPhase] = useState<'images' | 'videos'>('images');
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const { onProgress, promise } = preloadAllAssets();
 
+    const IMAGE_COUNT = 130; // 图片数量（大约）
+
     onProgress((loaded, total) => {
-      setProgress(Math.round((loaded / total) * 100));
+      const pct = Math.round((loaded / total) * 100);
+      setProgress(pct);
+
+      // 图片加载完了，切到视频阶段
+      if (loaded >= IMAGE_COUNT && phase === 'images') {
+        setPhase('videos');
+      }
     });
 
     promise.then(() => {
       setReady(true);
-      // 短暂延迟让100%状态显示一下
       setTimeout(onComplete, 600);
     });
-  }, [onComplete]);
+  }, [onComplete, phase]);
+
+  const phaseText = phase === 'images'
+    ? '正在准备惊喜...'
+    : '正在加载视频...';
 
   return (
     <AnimatePresence>
@@ -74,15 +86,10 @@ export default function PreloadScreen({ onComplete }: PreloadScreenProps) {
           className="mb-8"
         >
           <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-            {/* 盒身 */}
             <rect x="10" y="35" width="60" height="35" rx="4" fill="#F4A261" />
-            {/* 盒盖 */}
             <rect x="6" y="28" width="68" height="12" rx="4" fill="#E9C46A" />
-            {/* 竖丝带 */}
             <rect x="35" y="28" width="10" height="42" fill="#E76F51" rx="2" />
-            {/* 横丝带 */}
             <rect x="6" y="32" width="68" height="6" fill="#E76F51" rx="1" />
-            {/* 蝴蝶结 */}
             <ellipse cx="32" cy="26" rx="10" ry="7" fill="#E76F51" />
             <ellipse cx="48" cy="26" rx="10" ry="7" fill="#E76F51" />
             <circle cx="40" cy="28" r="4" fill="#D62828" />
@@ -104,15 +111,16 @@ export default function PreloadScreen({ onComplete }: PreloadScreenProps) {
           RAY的生日日历
         </motion.h1>
 
-        {/* 副标题 */}
+        {/* 阶段提示 */}
         <motion.p
+          key={phase}
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.7 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
+          transition={{ duration: 0.5 }}
           className="text-sm mb-10 tracking-widest"
           style={{ color: '#B8A9D4', fontFamily: 'Quicksand, sans-serif' }}
         >
-          正在准备惊喜...
+          {phaseText}
         </motion.p>
 
         {/* 进度条 */}
@@ -123,7 +131,9 @@ export default function PreloadScreen({ onComplete }: PreloadScreenProps) {
           <motion.div
             className="h-full rounded-full"
             style={{
-              background: 'linear-gradient(90deg, #E9C46A, #F4A261)',
+              background: phase === 'images'
+                ? 'linear-gradient(90deg, #E9C46A, #F4A261)'
+                : 'linear-gradient(90deg, #B8A9D4, #7B68EE)',
               width: `${progress}%`,
             }}
             transition={{ duration: 0.3 }}
